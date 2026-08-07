@@ -1,0 +1,18 @@
+# Emacs - Pastas de pacotes e cache
+elpa/
+straight/
+quelpa/
+var/
+auto-save-list/
+eln-cache/
+elfeed/
+transient/
+tree-sitter/
+config.el
+org-roam.db
+projectile-bookmarks.eld
+
+# Ficheiros temporários e backups
+*~
+#*#
+.DS_Store
