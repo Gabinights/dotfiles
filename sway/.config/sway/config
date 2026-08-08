@@ -35,7 +35,7 @@ client.urgent           #f38ba8   #1e1e2e    #f38ba8   #f38ba8   #f38ba8
 ### Output configuration
 #
 # Default wallpaper (more resolutions are available in /usr/share/backgrounds/sway/)
-output * bg /home/gabi/Pictures/Wallpapers/fields.jpg fill
+output * bg /home/gabi/Pictures/Wallpapers/space.jpg fill
 #
 # Example configuration:
 #
@@ -235,6 +235,8 @@ bindsym $mod+r mode "resize"
     # bindsym XF86KbdBrightnessToggle exec brightnessctl -d *::kbd_backlight set 5%+
 
 include /etc/sway/config.d/*
+
+for_window [app_id="wofi"] floating enable, border pixel 0, move position center
 
 # --- AUTORUN ---
 exec --no-startup-id mako

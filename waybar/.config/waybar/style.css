@@ -1,0 +1,44 @@
+* {
+    font-family: "JetBrainsMono Nerd Font";
+    font-size: 13px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: rgba(30, 30, 46, 0.6); /* Fundo transparente Mocha */
+    border-bottom: none;
+    color: #cdd6f4;
+    box-shadow: none;
+}
+
+#workspaces button {
+    padding: 0;
+    /* Para uma bola perfeita no GTK: min-width e min-height iguais */
+    min-width: 26px; 
+    min-height: 26px;
+    /* O raio deve ser exatamente metade do tamanho (13px é metade de 26px) */
+    border-radius: 13px; 
+    margin: 0 5px; /* Remove margem vertical, deixa apenas 5px de lado */
+    background-color: transparent;
+    color: #a6adc8; 
+}
+
+#workspaces button.focused {
+    color: #1e1e2e;
+    background: #cba6f7;
+    /* O border-radius precisa de ser repetido aqui para não ser esmagado */
+    border-radius: 13px; 
+}
+
+#workspaces button label {
+    margin: 0;
+    padding: 0;
+}
+
+#clock, #battery, #cpu, #memory, #pulseaudio, #network {
+    padding: 0 10px;
+    margin: 4px 2px;
+    background: #313244;
+    color: #cdd6f4;
+    border-radius: 6px;
+}
