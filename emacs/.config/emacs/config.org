@@ -4,7 +4,7 @@ Configuração do Garbage Collector para acelerar o arranque.
 (setq gc-cons-threshold (* 50 1024 1024))
 (add-hook 'emacs-startup-hook
           (lambda ()
-            (setq gc-cons-threshold (* 2 1024 1024))))
+            (setq gc-cons-threshold (* 50 1024 1024))))
 #+end_src
 
 * LIMPEZA VISUAL
@@ -18,12 +18,16 @@ Remover barras desnecessárias e ecrã de boas-vindas.
 
 * DEFAULTS & COMPORTAMENTO BASE
 #+begin_src elisp
-(setq make-backup-files nil)
-(setq auto-save-default nil)
+(setq backup-directory-alist '(("." . "~/.emacs.d/backups")))
+(setq auto-save-file-name-transforms '((".*" "~/.emacs.d/auto-save-list/" t)))
+(setq create-lockfiles nil)
 (setq-default fill-column 80)
+;; Desativa completamente o som de erro (não faz som nem pisca)
+(setq ring-bell-function 'ignore)
 
 (electric-pair-mode 1)
 #+end_src
+
 
 * NÚMEROS DE LINHA
 Ativa os números de linha relativos para facilitar a navegação, exceto em modos de leitura.
@@ -203,6 +207,8 @@ Configurações essenciais para escrita e blocos de código.
   (org-src-preserve-indentation nil)
   (org-edit-src-content-indentation 0)
   (org-src-tab-acts-natively t)
+  (org-startup-with-inline-images t)
+  (org-image-actual-width nil)
   :config
   (org-babel-do-load-languages
    'org-babel-load-languages
@@ -225,7 +231,7 @@ Configurações essenciais para escrita e blocos de código.
   :config
   (org-download-enable)
   (setq-default org-download-image-dir "./images")
-  (setq org-download-screenshot-method "wl-paste -t image/png > %s"))
+  (setq org-download-clipboard-command "wl-paste -t image/png > %s"))
 #+end_src
 
 * VERIFICAÇÃO DE SINTAXE (FLYCHECK)
@@ -247,13 +253,15 @@ Motor de parsing moderno. C e C++ mantidos propositadamente no modo clássico (r
 ;; 1. Dizer ao Emacs a localização exata das gramáticas testadas
 (setq treesit-language-source-alist
   '((bash       "https://github.com/tree-sitter/tree-sitter-bash")
+    (c          "https://github.com/tree-sitter/tree-sitter-c")
+    (cpp        "https://github.com/tree-sitter/tree-sitter-cpp")
     (python     "https://github.com/tree-sitter/tree-sitter-python")
     (json       "https://github.com/tree-sitter/tree-sitter-json")
     (yaml       "https://github.com/ikatyang/tree-sitter-yaml")
     (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile")))
 
 ;; 2. Instalar automaticamente as gramáticas
-(dolist (lang '(bash python json yaml dockerfile))
+(dolist (lang '(bash c cpp python json yaml dockerfile))
   (unless (treesit-language-available-p lang)
     (treesit-install-language-grammar lang)))
 
@@ -262,9 +270,27 @@ Motor de parsing moderno. C e C++ mantidos propositadamente no modo clássico (r
   :custom
   (treesit-auto-install nil)
   :config
-  (setq treesit-auto-langs '(python bash json yaml dockerfile))
+  (setq treesit-auto-langs '(c cpp python bash json yaml dockerfile))
   (treesit-auto-add-to-auto-mode-alist 'all)
   (global-treesit-auto-mode))
+#+end_src
+
+* LANGUAGE SERVER PROTOCOL (EGLOT + CLANGD)
+Obrigatório para desenvolvimento bare-metal em C.
+#+begin_src elisp
+(use-package eglot
+  :ensure nil ; Built-in
+  :hook ((c-mode c-ts-mode c++-mode c++-ts-mode) . eglot-ensure)
+  :config
+  ;; Desativa logs pesados que atrasam o Emacs
+  (fset #'jsonrpc--log-event #'ignore)
+  ;; Configura o clangd para projetos embebidos
+  (add-to-list 'eglot-server-programs
+               '((c-mode c-ts-mode c++-mode c++-ts-mode)
+                 . ("clangd"
+                    "--background-index"
+                    "--header-insertion=never" ; Evita que injete #includes indesejados
+                    "--completion-style=detailed"))))
 #+end_src
 
 * ZETTELKASTEN (ORG-ROAM)
@@ -410,17 +436,57 @@ Integração offline com o servidor local do llama.cpp via Vulkan.
 #+end_src
 
 * PESQUISA INTELIGENTE (KHOJ)
-Integração com o servidor Khoj rodando no Raspberry Pi 5 para busca semântica nas notas.
+Integração com o servidor Khoj para busca semântica nas notas.
 #+begin_src elisp
 (use-package khoj
   :ensure t
   :bind ("C-c n s" . khoj) ; Atalho: "Notes Search"
   :config
-  ;; Aponta o Emacs para o servidor no seu RPi5
-  (setq khoj-server-url "http://192.168.1.201:5000")
+  ;; Aponta o Emacs para o servidor
+  (setq khoj-server-url "http://127.0.0.1:5000")
   
   ;; Opcional: Define a pasta padrão caso use a interface local do pacote
-  (setq khoj-notes-directory "~/org/roam"))
+  (setq khoj-index-directories '("~/org/roam/")))
+#+end_src
+
+* O MEU PRIMEIRO AGENTE (RAG)
+Integração direta entre a pesquisa semântica (Khoj) e a geração de texto (Llama).
+#+begin_src elisp
+(defun gabi/agente-notas (pesquisa pergunta)
+  "Agente RAG de 2 Fases: Pesquisa Cirúrgica + Resposta Estrita."
+  (interactive
+   (list (read-string "1. Palavras-chave para o Khoj (ex: gentoo instalação): ")
+         (read-string "2. O que queres perguntar ao Llama sobre isto?: ")))
+  
+  (require 'gptel)
+  (message "Fase 1: A extrair as notas sobre '%s' do Khoj..." pesquisa)
+  
+  (let* ((url (format "http://127.0.0.1:5000/api/search?q=%s&n=5" (url-hexify-string pesquisa)))
+         (comando (format "curl -s '%s'" url))
+         (resultados-khoj (shell-command-to-string comando))
+         (buffer-resposta (get-buffer-create "*Síntese do Agente*"))
+         
+         ;; PROMPT DE FERRO: Proibido inventar.
+         (prompt-sistema (concat "És um assistente técnico de extração de informação. "
+                                 "Vais receber dados JSON retirados das notas do utilizador.\n\n"
+                                 "REGRAS ABSOLUTAS:\n"
+                                 "1. Baseia a resposta EXCLUSIVAMENTE nos dados abaixo.\n"
+                                 "2. NÃO inventes conhecimento externo. Se não está nos dados, não escrevas.\n"
+                                 "3. Ignora o código JSON e foca-te apenas no texto org-mode que está lá dentro.\n\n"
+                                 "DADOS EXTRAÍDOS:\n"
+                                 resultados-khoj)))
+    
+    (pop-to-buffer buffer-resposta)
+    (erase-buffer)
+    (org-mode)
+    (insert (format "#+TITLE: %s\n" pergunta))
+    (insert (format "#+SUBTITLE: Baseado na pesquisa por: %s\n" pesquisa))
+    (insert (format "#+DATE: %s\n\n" (format-time-string "%Y-%m-%d")))
+    
+    (message "Fase 2: A analisar notas e a gerar resposta...")
+    (gptel-request pergunta
+                   :system prompt-sistema
+                   :stream t)))
 #+end_src
 
 
@@ -441,6 +507,7 @@ Integração com o servidor Khoj rodando no Raspberry Pi 5 para busca semântica
         (message "A descarregar o artigo completo...")
         (eww link))))
   :config
+  (setq elfeed-use-curl t)
   ;; Atualiza o Elfeed a cada 30 minutos em background
   (run-at-time nil (* 30 60) #'elfeed-update))
 

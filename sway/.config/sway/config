@@ -35,7 +35,7 @@ client.urgent           #f38ba8   #1e1e2e    #f38ba8   #f38ba8   #f38ba8
 ### Output configuration
 #
 # Default wallpaper (more resolutions are available in /usr/share/backgrounds/sway/)
-output * bg /home/gabi/Pictures/Wallpapers/space.jpg fill
+output * bg /home/gabi/Pictures/Wallpapers/cars.jpg fill
 #
 # Example configuration:
 #
@@ -237,6 +237,7 @@ bindsym $mod+r mode "resize"
 include /etc/sway/config.d/*
 
 for_window [app_id="wofi"] floating enable, border pixel 0, move position center
+for_window [app_id="nmtui-wifi"] floating enable, resize set width 500 height 600, move position center
 
 # --- AUTORUN ---
 exec --no-startup-id mako
@@ -246,3 +247,4 @@ exec --no-startup-id pipewire &
 exec --no-startup-id wireplumber &
 exec --no-startup-id pipewire-pulse
 exec --no-startup-id mako
+exec nm-applet --indicator
