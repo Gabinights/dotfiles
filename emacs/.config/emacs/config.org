@@ -18,8 +18,17 @@ Remover barras desnecessárias e ecrã de boas-vindas.
 
 * DEFAULTS & COMPORTAMENTO BASE
 #+begin_src elisp
-(setq backup-directory-alist '(("." . "~/.emacs.d/backups")))
-(setq auto-save-file-name-transforms '((".*" "~/.emacs.d/auto-save-list/" t)))
+;; Define os caminhos de forma dinâmica com base na localização real da configuração
+(defvar my-backup-dir (expand-file-name "backups/" user-emacs-directory))
+(defvar my-autosave-dir (expand-file-name "auto-save-list/" user-emacs-directory))
+
+;; Força a criação das pastas no sistema de ficheiros caso não existam
+(unless (file-exists-p my-backup-dir) (make-directory my-backup-dir t))
+(unless (file-exists-p my-autosave-dir) (make-directory my-autosave-dir t))
+
+;; Aplica as regras (o acento grave ` permite a injeção da variável com a vírgula)
+(setq backup-directory-alist `(("." . ,my-backup-dir)))
+(setq auto-save-file-name-transforms `((".*" ,my-autosave-dir t)))
 (setq create-lockfiles nil)
 (setq-default fill-column 80)
 ;; Desativa completamente o som de erro (não faz som nem pisca)
@@ -284,12 +293,19 @@ Obrigatório para desenvolvimento bare-metal em C.
   :config
   ;; Desativa logs pesados que atrasam o Emacs
   (fset #'jsonrpc--log-event #'ignore)
+  
+  ;; Formatação automática antes de guardar (apenas para buffers geridos pelo LSP)
+  (add-hook 'eglot-managed-mode-hook
+            (lambda ()
+              (when (derived-mode-p 'c-mode 'c-ts-mode 'c++-mode 'c++-ts-mode)
+                (add-hook 'before-save-hook #'eglot-format-buffer -10 t))))
+
   ;; Configura o clangd para projetos embebidos
   (add-to-list 'eglot-server-programs
                '((c-mode c-ts-mode c++-mode c++-ts-mode)
                  . ("clangd"
                     "--background-index"
-                    "--header-insertion=never" ; Evita que injete #includes indesejados
+                    "--header-insertion=never" ; Evita #includes de bibliotecas standard do SO
                     "--completion-style=detailed"))))
 #+end_src
 
@@ -432,7 +448,34 @@ Integração offline com o servidor local do llama.cpp via Vulkan.
   (setq gptel-model 'Llama-3.2-3B)
   
   (setq gptel-directives 
-        '((default . "You are a senior embedded C engineer. Keep your answers technical, accurate, and concise. Do not use Markdown formatting unless requested."))))
+	'((default . "You are a Senior Staff Embedded Software Engineer. 
+Your primary domains are bare-metal C, ARM Cortex-M (STM32), ESP32, and Linux terminal tooling.
+
+STRICT RULES OF INTERACTION:
+1. Tone: Zero fluff. No greetings, no sycophancy, no apologies. Deliver dense, direct, and highly technical answers.
+2. Architecture First: Ground your explanations in physical hardware reality. Explain memory mapping, register states, clock cycles, and bitwise operations.
+3. Code Standard: Favour direct register manipulation (bare-metal) over HAL abstractions. Write robust, deterministic C code. 
+4. Environment: Assume the user operates strictly in Linux, compiling with CMake/GCC, debugging with GDB/OpenOCD, and editing in Emacs.")
+
+	  (elisp . "You are an Emacs Lisp architect. 
+Your task is to debug, optimize, or write Emacs Lisp code for a highly customized Emacs 30 environment.
+RULES:
+1. Use modern conventions (lexical-binding, use-package, cl-lib).
+2. Prioritize performance and non-blocking execution (asynchronous processes where applicable).
+3. Provide the raw code and a dense technical explanation of the evaluation model or API used. No basic tutorials.")
+
+          (rag . "You are a data-extraction and synthesis engine.
+You will receive JSON or plain text data extracted from an org-roam Zettelkasten via a RAG pipeline.
+RULES:
+1. Base your answer EXCLUSIVELY on the provided data.
+2. DO NOT hallucinate external knowledge. If the answer is not in the text, state exactly that.
+3. Output the response in clean Org-mode syntax (using headings, lists, and code blocks) for easy integration into the user's notes.")
+
+          (refactor . "You are a strict code reviewer and refactoring engine.
+Analyze the provided C/Zig/Rust code.
+1. Identify memory leaks, race conditions, blocking operations, or inefficient bitwise logic.
+2. Provide the refactored code block.
+3. List the structural changes made in bullet points, focusing on space/time complexity and hardware safety."))))
 #+end_src
 
 * PESQUISA INTELIGENTE (KHOJ)
