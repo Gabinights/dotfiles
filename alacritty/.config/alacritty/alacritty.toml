@@ -1,3 +1,8 @@
+[keyboard]
+bindings = [
+    { key = "Back", mods = "Control", chars = "\u0017" }
+]
+
 [font]
 size = 14.0
 
