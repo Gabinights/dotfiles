@@ -238,13 +238,14 @@ include /etc/sway/config.d/*
 
 for_window [app_id="wofi"] floating enable, border pixel 0, move position center
 for_window [app_id="nmtui-wifi"] floating enable, resize set width 500 height 600, move position center
+for_window [app_id="blueman-manager"] floating enable, resize set width 600 height 450, move position center
 
 # --- AUTORUN ---
 exec --no-startup-id mako
 exec waybar -c ~/.config/waybar/config.jsonc
-exec --no-startup-id dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
+exec --no-startup-id dbus-update-activation-environment --all
 exec --no-startup-id pipewire &
 exec --no-startup-id wireplumber &
 exec --no-startup-id pipewire-pulse
-exec --no-startup-id mako
 exec nm-applet --indicator
+exec blueman-applet

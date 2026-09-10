@@ -558,6 +558,8 @@ Integração direta entre a pesquisa semântica (Khoj) e a geração de texto (L
   :ensure t
   :after elfeed
   :config
+  (setq elfeed-protocol-fever-update-unread-only t)
+  
   (setq elfeed-feeds
         '(("fever+https://gabi@vm-magasirala-rss.duckdns.org"
            :api-url "https://vm-magasirala-rss.duckdns.org/api/fever.php"

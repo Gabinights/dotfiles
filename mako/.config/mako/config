@@ -1,0 +1,15 @@
+# Auto-dismiss after 5 seconds (5000 milliseconds)
+default-timeout=5000
+ignore-timeout=0
+
+# Visual Styling
+background-color=#282a36fa
+text-color=#e6e6ea
+border-color=#44475a
+border-size=2
+border-radius=8
+padding=15
+margin=10
+
+# Font (Change this to match your Waybar font)
+font=sans-serif 11

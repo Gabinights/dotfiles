@@ -35,10 +35,18 @@ window#waybar {
     padding: 0;
 }
 
-#clock, #battery, #cpu, #memory, #pulseaudio, #network {
+#clock, #battery, #cpu, #memory, #pulseaudio, #network, #tray {
     padding: 0 10px;
     margin: 4px 2px;
     background: #313244;
     color: #cdd6f4;
     border-radius: 6px;
+}
+
+#battery.warning {
+    color: #ffcc00; /* Turns yellow at 30% */
+}
+
+#battery.critical:not(.charging) {
+    color: #ff3333; /* Turns red at 20%, but goes back to normal if plugged in */
 }

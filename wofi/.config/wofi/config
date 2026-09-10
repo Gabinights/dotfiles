@@ -16,3 +16,4 @@ location=center
 xoffset=0
 yoffset=0
 normal_window=true
+term=alacritty
