@@ -62,7 +62,7 @@ bindkey "\e[1;5C" forward-word
 bindkey '^[[A' history-substring-search-up
 bindkey '^[[B' history-substring-search-down
 bindkey '^R' history-incremental-search-backward
-bindkey "^W" backward-kill-word
+bindkey "^H" backward-kill-word
 bindkey "^U" backward-kill-line
 bindkey "^K" kill-line
 bindkey "^A" beginning-of-line

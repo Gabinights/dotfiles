@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t; -*-
+
 ;; Desligar alguns avisos de compilação desnecessários
 (setq ad-redefinition-action 'accept)
 

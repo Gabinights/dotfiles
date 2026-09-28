@@ -1,3 +1,7 @@
+#+begin_src elisp
+;; -*- lexical-binding: t; -*-
+#+end_src
+
 * PERFORMANCE
 Configuração do Garbage Collector para acelerar o arranque.
 #+begin_src elisp
@@ -491,47 +495,6 @@ Integração com o servidor Khoj para busca semântica nas notas.
   ;; Opcional: Define a pasta padrão caso use a interface local do pacote
   (setq khoj-index-directories '("~/org/roam/")))
 #+end_src
-
-* O MEU PRIMEIRO AGENTE (RAG)
-Integração direta entre a pesquisa semântica (Khoj) e a geração de texto (Llama).
-#+begin_src elisp
-(defun gabi/agente-notas (pesquisa pergunta)
-  "Agente RAG de 2 Fases: Pesquisa Cirúrgica + Resposta Estrita."
-  (interactive
-   (list (read-string "1. Palavras-chave para o Khoj (ex: gentoo instalação): ")
-         (read-string "2. O que queres perguntar ao Llama sobre isto?: ")))
-  
-  (require 'gptel)
-  (message "Fase 1: A extrair as notas sobre '%s' do Khoj..." pesquisa)
-  
-  (let* ((url (format "http://127.0.0.1:5000/api/search?q=%s&n=5" (url-hexify-string pesquisa)))
-         (comando (format "curl -s '%s'" url))
-         (resultados-khoj (shell-command-to-string comando))
-         (buffer-resposta (get-buffer-create "*Síntese do Agente*"))
-         
-         ;; PROMPT DE FERRO: Proibido inventar.
-         (prompt-sistema (concat "És um assistente técnico de extração de informação. "
-                                 "Vais receber dados JSON retirados das notas do utilizador.\n\n"
-                                 "REGRAS ABSOLUTAS:\n"
-                                 "1. Baseia a resposta EXCLUSIVAMENTE nos dados abaixo.\n"
-                                 "2. NÃO inventes conhecimento externo. Se não está nos dados, não escrevas.\n"
-                                 "3. Ignora o código JSON e foca-te apenas no texto org-mode que está lá dentro.\n\n"
-                                 "DADOS EXTRAÍDOS:\n"
-                                 resultados-khoj)))
-    
-    (pop-to-buffer buffer-resposta)
-    (erase-buffer)
-    (org-mode)
-    (insert (format "#+TITLE: %s\n" pergunta))
-    (insert (format "#+SUBTITLE: Baseado na pesquisa por: %s\n" pesquisa))
-    (insert (format "#+DATE: %s\n\n" (format-time-string "%Y-%m-%d")))
-    
-    (message "Fase 2: A analisar notas e a gerar resposta...")
-    (gptel-request pergunta
-                   :system prompt-sistema
-                   :stream t)))
-#+end_src
-
 
 * LEITOR DE NOTÍCIAS (ELFEED + FRESHRSS)
 #+begin_src elisp
