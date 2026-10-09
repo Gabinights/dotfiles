@@ -22,6 +22,7 @@ Remover barras desnecessárias e ecrã de boas-vindas.
 
 * DEFAULTS & COMPORTAMENTO BASE
 #+begin_src elisp
+(setq auth-sources '("~/.authinfo.gpg"))
 ;; Define os caminhos de forma dinâmica com base na localização real da configuração
 (defvar my-backup-dir (expand-file-name "backups/" user-emacs-directory))
 (defvar my-autosave-dir (expand-file-name "auto-save-list/" user-emacs-directory))
@@ -432,25 +433,138 @@ O núcleo do sistema de notas.
   (dired-dwim-target t))
 #+end_src
 
-* AI ASSISTANT (GPTEL - LOCAL LLAMA.CPP)
-Integração offline com o servidor local do llama.cpp via Vulkan.
+* AI ASSISTANT (GPTEL - MULTI-BACKEND)
+Integração com APIs Cloud (OpenRouter, Anthropic, DeepSeek) via auth-source.
 #+begin_src elisp
 (use-package gptel
   :ensure t
-  :bind (("C-c q" . gptel-menu)   ; Abre o menu interativo (O que você quer)
-         ("C-c RET" . gptel-send)) ; Envia instantaneamente (Para chat rápido)
+  :bind (("C-c q" . gptel-menu)
+         ("C-c RET" . gptel-send))
   :config
-  ;; O llama-server imita a API da OpenAI perfeitamente
-  (setq gptel-backend 
-        (gptel-make-openai "llama.cpp" 
-          :protocol "http"
-          :host "localhost:8080"
-          :stream t
-          :key "no-key"
-          :models '("Llama-3.2-3B")))
+  ;; Função auxiliar para ir buscar chaves em segurança ao ~/.authinfo
+  (defun my/get-api-key (host)
+    (let ((info (nth 0 (auth-source-search :host host :user "apikey"))))
+      (if info
+          (let ((secret (plist-get info :secret)))
+            (if (functionp secret) (funcall secret) secret))
+        (error "API key for %s not found in auth-source" host))))
+
+  ;; ---------------------------------------------------------
+  ;; BACKEND 1: OPENROUTER (O Canivete Suíço)
+  ;; ---------------------------------------------------------
+  (defvar gptel-openrouter
+    (gptel-make-openai "OpenRouter"
+      :host "openrouter.ai"
+      :endpoint "/api/v1/chat/completions"
+      :stream t
+      :key (lambda () (my/get-api-key "openrouter.ai"))
+      :models '("anthropic/claude-4.8-opus"		; Heavy Architect
+		"anthropic/claude-5.5-sonnet"		; Fast Systems Logic
+                "deepseek/deepseek-r2"		; Cheap Refactoring
+                "qwen/qwen-2.5-coder-32b-instruct"	; RAG / Context eater
+                "meta-llama/llama-4-70b-instruct")))
+
+  ;; ---------------------------------------------------------
+  ;; BACKEND 2: DEEPSEEK (Direto)
+  ;; ---------------------------------------------------------
+  (defvar gptel-deepseek
+    (gptel-make-openai "DeepSeek"
+      :host "api.deepseek.com"
+      :endpoint "/chat/completions"
+      :stream t
+      :key (lambda () (my/get-api-key "api.deepseek.com"))
+      :models '("deepseek-chat" "deepseek-reasoner")))
+
+  ;; ---------------------------------------------------------
+  ;; BACKEND 3: ANTHROPIC (Direto - Opcional)
+  ;; ---------------------------------------------------------
+  (defvar gptel-anthropic
+    (gptel-make-anthropic "Anthropic"
+      :stream t
+      :key (lambda () (my/get-api-key "api.anthropic.com"))))
+
+  ;; Define OpenRouter + Claude 4.8 como o cérebro principal por defeito
+  (setq gptel-backend gptel-openrouter)
+  (setq gptel-model 'anthropic/claude-5.5-sonnet)
+
+  ;; ---------------------------------------------------------
+  ;; MCP SERVER & TOOL CALLING (Automated & Dynamic Engine)
+  ;; ---------------------------------------------------------
   
-  (setq gptel-model 'Llama-3.2-3B)
+  ;; 1. MUST KEEP: Enable tool calling universally in gptel
+  (setq gptel-use-tools t)
+
+  ;; 2. Load the MCP package and define the sandbox registration logic
+  (when (require 'gptel-mcp nil t)
+    
+    (defun my/link-ai-sandbox-to-project ()
+      "Registers and restarts the MCP sandbox locked to the current Projectile root."
+      (interactive)
+      (let ((root (if (fboundp 'projectile-project-root)
+                      (projectile-project-root)
+                    default-directory)))
+        (unless root (error "Not in a project directory!"))
+        
+        ;; Register the server dynamically using the project root
+        (gptel-mcp-server "C-Sandbox"
+          :command "env"
+          :args (list (concat "MCP_WORKSPACE=" (expand-file-name root))
+                      "python3"
+                      (expand-file-name "~/ai-agent/src/mcp_server.py"))
+          :type 'stdio)
+          
+        (message "✅ AI Sandbox successfully locked to: %s" root))
+    )
+
+    ;; 3. SCENARIO 1 AUTOMATION: Hook it into Projectile so it runs automatically
+    (defun my/auto-link-sandbox-to-project (&rest _)
+      "Automatically bind the MCP server when switching projects."
+      (my/link-ai-sandbox-to-project))
+
+    ;; Automatically trigger the sync whenever Projectile switches projects
+    (advice-add 'projectile-switch-project-by-name :after #'my/auto-link-sandbox-to-project))
+
+  ;; ---------------------------------------------------------
+  ;; SCENARIO 2: THE "FIX THIS ERROR" QUICK-ACTION
+  ;; ---------------------------------------------------------
+  (defun my/gptel-fix-region-or-buffer ()
+    "Send the current region (or whole buffer) to gptel with the agent directive 
+    and instantly request an autonomous fix."
+    (interactive)
+    (let* ((beg (if (use-region-p) (region-beginning) (point-min)))
+           (end (if (use-region-p) (region-end) (point-max)))
+           (content (buffer-substring-no-properties beg end))
+           ;; Temporarily force the agent directive for this request
+           (gptel-directives `((agent . "Fix the following code, compile it using your tools, and ensure it passes."))))
+      
+      ;; Open gptel session and fire the request immediately
+      (gptel nil nil (concat "Fix this code and make it compile:\n\n```\n" content "\n```"))
+      (message "🤖 Agent dispatched to fix code block...")))
+
+  ;; Bind it to a quick global shortcut
+  (global-set-key (kbd "C-c f") #'my/gptel-fix-region-or-buffer)
+
+  (defun my/mcp-quick-architecture ()
+    "Quickly inspect the architecture of the current file using the MCP server."
+    (interactive)
+    (let ((file (buffer-file-name)))
+      (unless file (user-error "Buffer is not visiting a file"))
+      ;; Call your server's tool directly or via a transient menu
+      (message "Analyzing architecture for %s..." (file-name-nondirectory file))
+      ;; (Optional integration point with your python script or gptel)
+      ))
   
+  ;; Add an Agent-specific prompt to your directives
+  (add-to-list 'gptel-directives 
+    '(agent . "You are an autonomous C developer operating in a strict Linux sandbox.
+You have access to tools. ALWAYS use them to verify your work.
+RULES:
+1. If asked to fix or write code, write the file to disk using your tool.
+2. Compile it using your shell tool (e.g., `gcc -Wall file.c -o out`).
+3. If it fails, read the stderr, fix the code, and re-compile.
+4. Do not explain your steps to the user. Just execute the loop until compilation passes, then report the final status."))
+  
+  ;; Mantém as tuas diretivas exatas
   (setq gptel-directives 
 	'((default . "You are a Senior Staff Embedded Software Engineer. 
 Your primary domains are bare-metal C, ARM Cortex-M (STM32), ESP32, and Linux terminal tooling.
@@ -480,6 +594,43 @@ Analyze the provided C/Zig/Rust code.
 1. Identify memory leaks, race conditions, blocking operations, or inefficient bitwise logic.
 2. Provide the refactored code block.
 3. List the structural changes made in bullet points, focusing on space/time complexity and hardware safety."))))
+#+end_src
+
+* AUTOMATIZAÇÃO DE MODELOS (GPTEL)
+#+begin_src elisp
+(defun my/gptel-auto-model-switch (orig-fun &rest args)
+  "Intercepts `gptel-send`. If the active system message matches the 'refactor' 
+directive, force DeepSeek. Otherwise, default to Claude."
+  (let ((gptel-model 
+         ;; Compare the current buffer's system message against the refactor directive
+         (if (string= gptel-system-message (alist-get 'refactor gptel-directives))
+             "deepseek/deepseek-r2"            ; The exact string from your :models list
+           "anthropic/claude-4.8-sonnet")))    ; The default fallback
+    (apply orig-fun args)))
+
+;; Attach the advice around gptel-send
+(advice-add 'gptel-send :around #'my/gptel-auto-model-switch)
+#+end_src
+
+* ATALHO DE REFATORAÇÃO INLINE
+#+begin_src elisp
+(defun my/gptel-refactor-region ()
+  "Bypasses the gptel menu. Sends the selected region directly to DeepSeek 
+with the refactoring persona."
+  (interactive)
+  (unless (use-region-p)
+    (user-error "Select a block of code to refactor first."))
+  
+  ;; Dynamically bind the specific backend, model, and directive for this execution only
+  (let ((gptel-backend gptel-openrouter)
+        (gptel-model "deepseek/deepseek-r2")
+        (gptel-system-message (alist-get 'refactor gptel-directives)))
+    
+    ;; Execute the send command on the active region
+    (gptel-send)))
+
+;; Bind it to C-c c r (Code Refactor)
+(define-key global-map (kbd "C-c c r") #'my/gptel-refactor-region)
 #+end_src
 
 * PESQUISA INTELIGENTE (KHOJ)
