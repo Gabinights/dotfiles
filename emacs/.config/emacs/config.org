@@ -23,6 +23,8 @@ Remover barras desnecessárias e ecrã de boas-vindas.
 * DEFAULTS & COMPORTAMENTO BASE
 #+begin_src elisp
 (setq auth-sources '("~/.authinfo.gpg"))
+(setq epg-pinentry-mode 'loopback)
+
 ;; Define os caminhos de forma dinâmica com base na localização real da configuração
 (defvar my-backup-dir (expand-file-name "backups/" user-emacs-directory))
 (defvar my-autosave-dir (expand-file-name "auto-save-list/" user-emacs-directory))
@@ -149,6 +151,10 @@ Funciona como um "botão direito do rato" para o teclado.
 * ESTÉTICA
 Tema e embelezamento do Org-mode.
 #+begin_src elisp
+(set-face-attribute 'default nil :family "JetBrainsMono Nerd Font" :height 110)
+
+(set-fontset-font t 'unicode (font-spec :family "JetBrainsMono Nerd Font") nil 'prepend)
+
 (use-package doom-themes
   :config
   (load-theme 'doom-dracula t))
@@ -159,8 +165,9 @@ Tema e embelezamento do Org-mode.
 
 ** ÍCONES (NERD-ICONS)
 #+begin_src elisp
-(use-package nerd-icons)
-
+(use-package nerd-icons
+  :init
+    (setq nerd-icons-font-family "JetBrainsMono Nerd Font"))
 (use-package nerd-icons-completion
   :after (marginalia vertico)
   :init

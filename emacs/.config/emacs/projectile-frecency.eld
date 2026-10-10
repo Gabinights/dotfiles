@@ -1,0 +1,1 @@
+(("/home/gabi/.dotfiles/" ("emacs/.config/emacs/config.org" 2 1791650072) ("emacs/.config/emacs/init.el" 3 1791648159) ("alacritty/.config/alacritty/alacritty.toml" 2 1791649868)))
