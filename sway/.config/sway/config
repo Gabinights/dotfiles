@@ -228,7 +228,7 @@ bindsym $mod+r mode "resize"
     bindsym XF86MonBrightnessDown exec brightnessctl set 5%-
     bindsym XF86MonBrightnessUp exec brightnessctl set +5%
     # Special key to take a screenshot with grim
-    bindsym F11 exec grim -g "$(slurp)" - | tee ~/Pictures/Screenshots/screenshot_$(date +%Y%m%d_%H%M%S).png | wl-copy
+    bindsym F11 exec sh -c 'GEOM=$(slurp) && [ -n "$GEOM" ] && grim -g "$GEOM" - | tee "$HOME/Pictures/Screenshots/screenshot_$(date +%Y%m%d_%H%M%S).png" | wl-copy -t image/png'
 
     bindsym XF86TouchpadToggle exec swaymsg input type:touchpad events toggle
 
@@ -248,8 +248,13 @@ bar {
 # --- AUTORUN ---
 exec --no-startup-id mako
 exec --no-startup-id dbus-update-activation-environment --all
-exec --no-startup-id pipewire &
-exec --no-startup-id wireplumber &
-exec --no-startup-id pipewire-pulse
+# exec --no-startup-id pipewire &
+# exec --no-startup-id wireplumber &
+# exec --no-startup-id pipewire-pulse
 exec nm-applet --indicator
 exec blueman-applet
+
+# --- netbeans ---
+exec_always gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"
+for_window [app_id="spotify_popup"] floating enable, sticky enable, border pixel 0, move position cursor, move down 38px
+for_window [app_id="power_popup"] floating enable, sticky enable, border pixel 0, move position cursor, move down 38px, move left 60px

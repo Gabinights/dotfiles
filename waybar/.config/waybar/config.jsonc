@@ -2,16 +2,31 @@
     "layer": "top",
     "position": "top",
     "height": 30,
-    "modules-left": ["sway/workspaces", "sway/mode"],
-    "modules-center": [],
-    "modules-right": ["tray", "pulseaudio", "cpu", "memory", "battery", "clock"],
+  "modules-left": [ "cpu", "memory", "sway/workspaces", "sway/mode"],
+    "modules-center": ["clock"],
+  "modules-right": ["mpris", "tray", "pulseaudio", "battery", "custom/power"],
+
+    "mpris": {
+      "format": "{player_icon} {title}",
+      "format-paused": "{status_icon} <i>{title}</i>",
+      "player-icons": {
+          "default": "▶",
+          "spotify": ""
+      },
+      "status-icons": {
+          "paused": "⏸"
+      },
+      "ignored-players": ["firefox", "chromium"],
+      "max-length": 35,
+      "on-click": "/home/gabi/.config/waybar/scripts/spotify_popup.py"
+    },
     
     "sway/workspaces": {
         "disable-scroll": true,
         "all-outputs": true
     },
     "clock": {
-        "format": "{:%H:%M}  ",
+        "format": "{:%H:%M}",
 	"tooltip-format": "<tt><small>{calendar}</small></tt>",
     	"calendar": {
             "mode"          : "month",
@@ -36,10 +51,10 @@
             "warning": 30,
             "critical": 20
         },
-        "format": "{icon} {capacity}%",
-	"format-charging": " {capacity}%",
-        "format-plugged": " {capacity}%",
-        "format-alt": "{time} {icon}",
+        "format": "{capacity}% {icon}",
+	"format-charging": "{capacity}% ",
+        "format-plugged": "{capacity}% ",
+        "format-alt": "{icon} {time}",
         "format-icons": ["", "", "", "", ""]
     },
     "cpu": {
@@ -55,5 +70,10 @@
     "tray": {
         "icon-size": 18,
         "spacing": 10
-    }
+    },
+    "custom/power": {
+      "format": "",
+      "tooltip": false,
+      "on-click": "/home/gabi/.config/waybar/scripts/toggle_power.sh"
+  }
 }
