@@ -35,7 +35,7 @@ client.urgent           #f38ba8   #1e1e2e    #f38ba8   #f38ba8   #f38ba8
 ### Output configuration
 #
 # Default wallpaper (more resolutions are available in /usr/share/backgrounds/sway/)
-output * bg /home/gabi/Pictures/Wallpapers/lexus.jpg fill
+output * bg /home/gabi/Pictures/Wallpapers/fc_rx7.jpg fill
 #
 # Example configuration:
 #
