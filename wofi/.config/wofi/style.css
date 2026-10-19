@@ -1,3 +1,8 @@
+* {
+    outline: none;
+    border: none;
+}
+
 window {
     background-color: rgba(30, 30, 46, 0.9);
     border: 1px solid #89b4fa;
@@ -6,6 +11,7 @@ window {
     font-size: 14px;
     font-weight: normal;
     box-shadow: none; /* Mata a sombra invisível do GTK que estraga o centro */
+    outline: none;
 }
 
 #input {
@@ -75,4 +81,20 @@ scrollbar slider {
 
 scrollbar slider:hover {
     background: #585b70;
+}
+
+#text, #img {
+    background-color: transparent;
+}
+
+#entry:selected #text,
+#entry:selected #img {
+    background-color: transparent;
+}
+
+/* Garante que apenas a linha inteira fica destacada */
+#entry:selected {
+    background-color: #44475a;
+    border-radius: 8px;
+    outline: none;
 }

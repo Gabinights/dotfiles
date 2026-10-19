@@ -248,11 +248,9 @@ bar {
 # --- AUTORUN ---
 exec --no-startup-id mako
 exec --no-startup-id dbus-update-activation-environment --all
-# exec --no-startup-id pipewire &
-# exec --no-startup-id wireplumber &
-# exec --no-startup-id pipewire-pulse
 exec nm-applet --indicator
 exec blueman-applet
+exec systemctl --user import-environment TERMINAL
 
 # --- netbeans ---
 exec_always gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"

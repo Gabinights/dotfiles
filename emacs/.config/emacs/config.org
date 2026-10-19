@@ -236,11 +236,12 @@ Configurações essenciais para escrita e blocos de código.
    '((emacs-lisp . t)
      (shell . t)
      (python . t)
-     (C . t)))
+     (C . t)
+     (java . t)))
   (require 'org-tempo)
   (setq org-confirm-babel-evaluate
         (lambda (lang body)
-          (not (member lang '("C" "shell" "emacs-lisp" "python"))))))
+          (not (member lang '("C" "shell" "emacs-lisp" "python" "java"))))))
 #+end_src
 
 * INSERÇÃO DE IMAGENS E RECORTES (ORG-DOWNLOAD)
@@ -279,10 +280,11 @@ Motor de parsing moderno. C e C++ mantidos propositadamente no modo clássico (r
     (python     "https://github.com/tree-sitter/tree-sitter-python")
     (json       "https://github.com/tree-sitter/tree-sitter-json")
     (yaml       "https://github.com/ikatyang/tree-sitter-yaml")
-    (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile")))
+    (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile")
+    (java       "https://github.com/tree-sitter/tree-sitter-java")))
 
 ;; 2. Instalar automaticamente as gramáticas
-(dolist (lang '(bash c cpp python json yaml dockerfile))
+(dolist (lang '(bash c cpp python json yaml dockerfile java))
   (unless (treesit-language-available-p lang)
     (treesit-install-language-grammar lang)))
 
@@ -291,7 +293,7 @@ Motor de parsing moderno. C e C++ mantidos propositadamente no modo clássico (r
   :custom
   (treesit-auto-install nil)
   :config
-  (setq treesit-auto-langs '(c cpp python bash json yaml dockerfile))
+  (setq treesit-auto-langs '(c cpp python bash json yaml dockerfile java))
   (treesit-auto-add-to-auto-mode-alist 'all)
   (global-treesit-auto-mode))
 #+end_src
@@ -301,7 +303,7 @@ Obrigatório para desenvolvimento bare-metal em C.
 #+begin_src elisp
 (use-package eglot
   :ensure nil ; Built-in
-  :hook ((c-mode c-ts-mode c++-mode c++-ts-mode) . eglot-ensure)
+  :hook ((c-mode c-ts-mode c++-mode c++-ts-mode java-mode java-ts-mode) . eglot-ensure)
   :config
   ;; Desativa logs pesados que atrasam o Emacs
   (fset #'jsonrpc--log-event #'ignore)
@@ -336,11 +338,26 @@ O núcleo do sistema de notas.
   :custom
   (org-roam-directory (file-truename "~/org/roam"))
   (org-roam-dailies-directory "daily/")
+  
+  ;; Templates para as notas diárias
   (org-roam-dailies-capture-templates
     '(("d" "default" entry
       "* Sessão de Trabalho: %?w"
       :target (file+head "%<%Y-%m-%d>.org" 
                          "#+title: %<%Y-%m-%d>\n#+filetags: :diario:sessao:\n\n* [/] Tarefas da Sessão\n** TODO Rever pendentes da sessão anterior\n** TODO %?\n\n* Notas de Engenharia & Logs\n"))))
+
+  ;; ---- ADICIONAR AQUI AS TEMPLATES GERAIS ----
+  (org-roam-capture-templates
+   '(("d" "Default" plain "%?"
+      :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
+                         "#+title: ${title}\n")
+      :unnarrowed t)
+     ("h" "Hardware Bring-Up" plain
+      (file "~/org/templates/bringup.org")
+      :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
+                         "#+title: ${title}\n#+author: \n#+date: %<%Y-%m-%d %H:%M>\n#+filetags: :embedded:hardware:register-map:bringup:\n")
+      :unnarrowed t)))
+  
   :config
   (unless (file-exists-p org-roam-directory)
     (make-directory org-roam-directory t))
