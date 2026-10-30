@@ -82,3 +82,9 @@ export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"
 
 # ---- Aliases ------------------------------------------------------------------
 alias get_idf='source ~/esp/esp-idf/export.sh'
+
+# Created by `pipx` on 2026-10-25 19:56:27
+export PATH="$PATH:/home/gabi/.local/bin"
+export EDITOR="emacs -nw"
+export VISUAL="emacs -nw"
+export EDITOR=emacs

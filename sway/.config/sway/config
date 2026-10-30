@@ -22,7 +22,7 @@ gaps inner 8
 gaps outer 4
 smart_gaps on
 
-default_border pixel 2
+default_border pixel 1
 default_floating_border pixel 2
 
 # Cores Catpuccin
@@ -35,7 +35,7 @@ client.urgent           #f38ba8   #1e1e2e    #f38ba8   #f38ba8   #f38ba8
 ### Output configuration
 #
 # Default wallpaper (more resolutions are available in /usr/share/backgrounds/sway/)
-output * bg /home/gabi/Pictures/Wallpapers/fc_rx7.jpg fill
+output * bg /home/gabi/Pictures/Wallpapers/r33_skyline.jpg fill
 #
 # Example configuration:
 #
@@ -256,3 +256,7 @@ exec systemctl --user import-environment TERMINAL
 exec_always gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"
 for_window [app_id="spotify_popup"] floating enable, sticky enable, border pixel 0, move position cursor, move down 38px
 for_window [app_id="power_popup"] floating enable, sticky enable, border pixel 0, move position cursor, move down 38px, move left 60px
+
+# Forçar ausência de barra de título no Emacs (cobre nativo PGTK e XWayland)
+for_window [app_id="emacs"] border pixel 1
+for_window [class="Emacs"] border pixel 1

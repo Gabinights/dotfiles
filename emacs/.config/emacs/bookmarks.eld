@@ -3,9 +3,9 @@
 ;;; nevertheless, you probably don't want to edit it.
 ;;; -*- End Of Bookmark File Format Version Stamp -*-
 (("org-capture-last-stored"
-  (filename . "~/org/roam/20261017171536-sovereign_mlops_ci_cd_pipeline.org")
-  (front-context-string . "\nHardware: Raspb")
-  (rear-context-string . " CI/CD Pipeline\n")
-  (position . 108)
-  (last-modified 27347 40756 644272 977000))
+  (filename . "~/org/roam/20261030101115-cabula_as.org")
+  (front-context-string . "\n* virtualização")
+  (rear-context-string . "itle: cabula_AS\n")
+  (position . 87)
+  (last-modified 27364 27983 503918 617000))
 )

@@ -1,88 +1,72 @@
+#+PROPERTY: header-args:elisp :tangle config.el
+#+auto_tangle: t
+
 #+begin_src elisp
-;; -*- lexical-binding: t; -*-
+;;; config.el --- Configuration file -*- lexical-binding: t; -*-
 #+end_src
 
 * PERFORMANCE
+
 Configuração do Garbage Collector para acelerar o arranque.
 #+begin_src elisp
-(setq gc-cons-threshold (* 50 1024 1024))
 (add-hook 'emacs-startup-hook
           (lambda ()
-            (setq gc-cons-threshold (* 50 1024 1024))))
+            (setq gc-cons-threshold (* 32 1024 1024)
+                  gc-cons-percentage 0.1)))
 #+end_src
 
-* LIMPEZA VISUAL
-Remover barras desnecessárias e ecrã de boas-vindas.
-#+begin_src elisp
-(menu-bar-mode -1)
-(tool-bar-mode -1)
-(scroll-bar-mode -1)
-(setq inhibit-startup-screen t)
-#+end_src
+* DEFAULTS
 
-* DEFAULTS & COMPORTAMENTO BASE
 #+begin_src elisp
 (setq auth-sources '("~/.authinfo.gpg"))
 (setq epg-pinentry-mode 'loopback)
 
-;; Define os caminhos de forma dinâmica com base na localização real da configuração
 (defvar my-backup-dir (expand-file-name "backups/" user-emacs-directory))
 (defvar my-autosave-dir (expand-file-name "auto-save-list/" user-emacs-directory))
 
-;; Força a criação das pastas no sistema de ficheiros caso não existam
 (unless (file-exists-p my-backup-dir) (make-directory my-backup-dir t))
 (unless (file-exists-p my-autosave-dir) (make-directory my-autosave-dir t))
 
-;; Aplica as regras (o acento grave ` permite a injeção da variável com a vírgula)
-(setq backup-directory-alist `(("." . ,my-backup-dir)))
-(setq auto-save-file-name-transforms `((".*" ,my-autosave-dir t)))
-(setq create-lockfiles nil)
-(setq-default fill-column 80)
-;; Desativa completamente o som de erro (não faz som nem pisca)
-(setq ring-bell-function 'ignore)
+(setq backup-directory-alist `(("." . ,my-backup-dir))
+      auto-save-file-name-transforms `((".*" ,my-autosave-dir t))
+      create-lockfiles nil
+      ring-bell-function #'ignore
+      native-comp-async-report-warnings-errors 'silent)
 
+(setq-default fill-column 80)
 (electric-pair-mode 1)
 #+end_src
 
-
 * NÚMEROS DE LINHA
-Ativa os números de linha relativos para facilitar a navegação, exceto em modos de leitura.
-#+begin_src elisp
-;; Define o estilo como relativo
-(setq display-line-numbers-type t)
 
-;; Ativa globalmente
+#+begin_src elisp
+(setq display-line-numbers-type t)
 (global-display-line-numbers-mode 1)
 
-;; Desativa em modos onde não fazem sentido (Org, PDFs, Terminais)
+(defun my/disable-line-numbers ()
+  "Desativa números de linha no buffer atual."
+  (display-line-numbers-mode -1))
+
 (dolist (mode '(org-mode-hook
                 pdf-view-mode-hook
                 term-mode-hook
                 eshell-mode-hook))
-  (add-hook mode (lambda () (display-line-numbers-mode -1))))
+  (add-hook mode #'my/disable-line-numbers))
 #+end_src
 
 * GESTOR DE PACOTES
-Configurar o =use-package= para instalar tudo automaticamente.
+
 #+begin_src elisp
 (require 'package)
-
-;; Adiciona o repositório da comunidade (MELPA)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
-
-;; Garante que a lista de pacotes está atualizada no primeiro arranque
 (package-initialize)
-(unless package-archive-contents
-  (package-refresh-contents))
+(setq package-install-upgrade-built-in nil)
 
-(setq package-install-upgrade-built-in t)
 (require 'use-package)
 (setq use-package-always-ensure t)
 #+end_src
 
 * INTERFACE MODERNA & ATALHOS WHICH-KEY
-Configuração do Vertico, Orderless e Marginalia para pesquisa rápida.
-O =which-key= é configurado aqui para dar nomes amigáveis aos nossos atalhos =C-c=.
 
 #+begin_src elisp
 (use-package vertico
@@ -99,16 +83,14 @@ O =which-key= é configurado aqui para dar nomes amigáveis aos nossos atalhos =
 (use-package consult
   :bind (("C-s" . consult-line)
          ("C-x b" . consult-buffer)
-         ;; Os nossos atalhos de pesquisa personalizados
          ("C-c s s" . consult-line)
          ("C-c s r" . consult-ripgrep)))
 
 (use-package which-key
-  :ensure nil ; Built-in no Emacs 30
+  :ensure nil
   :init (which-key-mode 1)
   :config
-  ;; Dá nomes bonitos aos menus do C-c
-  (which-key-add-key-based-replacements
+  (which-key-add-keymap-based-replacements global-map
     "C-c s" "Pesquisa"
     "C-c c" "Código/Estrutura"
     "C-c a" "Ações/Contexto"
@@ -116,19 +98,53 @@ O =which-key= é configurado aqui para dar nomes amigáveis aos nossos atalhos =
     "C-c n d" "Dailies"
     "C-c g" "Git"
     "C-c l" "Leitura/RSS"
-    "C-c p" "Projetos"))
+    "C-c p" "Projetos"
+    "C-c d" "Debug (DAPE)"))
+#+end_src
+
+* COMPLETION EM BUFFER (CORFU + CAPE)
+
+#+begin_src elisp
+(use-package corfu
+  :custom
+  (corfu-auto t)
+  (corfu-auto-delay 0.1)
+  (corfu-auto-prefix 2)
+  (corfu-cycle t)
+  (corfu-preselect 'first)
+  (corfu-count 10)
+  :init
+  (global-corfu-mode)
+  :config
+  (setq tab-always-indent 'complete))
+
+(use-package nerd-icons-corfu
+  :after corfu
+  :config
+  (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
+
+(use-package cape
+  :init
+  (add-to-list 'completion-at-point-functions #'cape-file)
+  (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+  :config
+  (defun my/setup-elisp-completion ()
+    (add-hook 'completion-at-point-functions #'cape-elisp-symbol -10 t))
+  (add-hook 'emacs-lisp-mode-hook #'my/setup-elisp-completion))
+
+(with-eval-after-load 'orderless
+  (add-to-list 'completion-category-overrides
+               '(eglot (styles orderless basic))))
 #+end_src
 
 * AÇÕES DE CONTEXTO (EMBARK)
-Funciona como um "botão direito do rato" para o teclado.
 
 #+begin_src elisp
 (use-package embark
   :bind
-  (("C-." . embark-act)         
-   ("M-." . embark-dwim)        
+  (("C-." . embark-act)
+   ("C-;" . embark-dwim)
    ("C-h B" . embark-bindings)
-   ;; Atalhos organizados no menu "Ações"
    ("C-c a a" . embark-act)
    ("C-c a d" . embark-dwim)
    ("C-c a e" . embark-export)
@@ -149,11 +165,10 @@ Funciona como um "botão direito do rato" para o teclado.
 #+end_src
 
 * ESTÉTICA
-Tema e embelezamento do Org-mode.
+
 #+begin_src elisp
 (set-face-attribute 'default nil :family "JetBrainsMono Nerd Font" :height 110)
-
-(set-fontset-font t 'unicode (font-spec :family "JetBrainsMono Nerd Font") nil 'prepend)
+(set-fontset-font t '(#xe000 . #xf8ff) (font-spec :family "JetBrainsMono Nerd Font") nil 'prepend)
 
 (use-package doom-themes
   :config
@@ -161,30 +176,21 @@ Tema e embelezamento do Org-mode.
 
 (use-package org-modern
   :hook (org-mode . org-modern-mode))
-#+end_src
 
-** ÍCONES (NERD-ICONS)
-#+begin_src elisp
 (use-package nerd-icons
   :init
-    (setq nerd-icons-font-family "JetBrainsMono Nerd Font"))
+  (setq nerd-icons-font-family "JetBrainsMono Nerd Font"))
+
 (use-package nerd-icons-completion
   :after (marginalia vertico)
   :init
   (nerd-icons-completion-mode)
   :hook
   (marginalia-mode . nerd-icons-completion-marginalia-setup))
-#+end_src
 
-** RAINBOW DELIMITERS
-#+begin_src elisp
 (use-package rainbow-delimiters
   :hook (prog-mode . rainbow-delimiters-mode))
-#+end_src
 
-* BARRA DE ESTADO (MODE-LINE)
-Uma barra de estado moderna, limpa e altamente informativa.
-#+begin_src elisp
 (use-package doom-modeline
   :init (doom-modeline-mode 1)
   :custom
@@ -197,7 +203,7 @@ Uma barra de estado moderna, limpa e altamente informativa.
 #+end_src
 
 * AUTOMATIZAÇÃO (ORG-AUTO-TANGLE)
-Gera o =config.el= automaticamente.
+
 #+begin_src elisp
 (use-package org-auto-tangle
   :defer t
@@ -206,22 +212,28 @@ Gera o =config.el= automaticamente.
   (setq org-auto-tangle-default t))
 #+end_src
 
-
 * ORG-MODE & LITERATE PROGRAMMING
-Configurações essenciais para escrita e blocos de código.
+
 #+begin_src elisp
 (use-package org
+  :ensure nil
   :bind (("C-c n a" . org-agenda))
   :hook (org-mode . visual-line-mode)
   :custom
   (org-directory "~/org/")
-  (org-agenda-files '("~/org/agenda/" "~/org/roam/daily/"))
   (org-todo-keywords
    '((sequence "TODO(t)" "DOING(i)" "WAIT(w)" "|" "DONE(d)" "CANCEL(c)")))
   (org-todo-keyword-faces
    '(("DOING" . (:foreground "#ffb86c" :weight bold))
      ("WAIT"  . (:foreground "#8be9fd" :weight bold))
      ("CANCEL". (:foreground "#6272a4" :weight bold))))
+  (org-agenda-skip-deadline-if-done t)
+  (org-agenda-skip-scheduled-if-done t)
+  (org-agenda-skip-deadline-prewarning-if-scheduled t)
+  (org-deadline-warning-days 7)
+  (org-agenda-todo-ignore-scheduled 'future)
+  (org-agenda-start-with-log-mode t)
+  (org-log-done 'time)
   (org-hide-emphasis-markers t)
   (org-startup-indented t)
   (org-src-fontify-natively t)
@@ -239,13 +251,13 @@ Configurações essenciais para escrita e blocos de código.
      (C . t)
      (java . t)))
   (require 'org-tempo)
+  (setq org-auto-tangle-default nil)
   (setq org-confirm-babel-evaluate
-        (lambda (lang body)
-          (not (member lang '("C" "shell" "emacs-lisp" "python" "java"))))))
-#+end_src
+        (lambda (lang _)
+          (not (and (string= lang "emacs-lisp")
+                    buffer-file-name
+                    (file-in-directory-p buffer-file-name user-emacs-directory))))))
 
-* INSERÇÃO DE IMAGENS E RECORTES (ORG-DOWNLOAD)
-#+begin_src elisp
 (use-package org-download
   :after org
   :defer t
@@ -256,79 +268,79 @@ Configurações essenciais para escrita e blocos de código.
   (setq org-download-clipboard-command "wl-paste -t image/png > %s"))
 #+end_src
 
-* VERIFICAÇÃO DE SINTAXE (FLYCHECK)
-#+begin_src elisp
-(use-package flycheck
-  :init
-  (global-flycheck-mode))
-#+end_src
+* VERIFICAÇÃO DE SINTAXE, TREE-SITTER & EGLOT
 
-* TREE-SITTER (SINTAXE ESTRUTURAL)
-Motor de parsing moderno. C e C++ mantidos propositadamente no modo clássico (regex).
 #+begin_src elisp
 (use-package treesit
   :ensure nil
-  :bind (("C-c c m" . treesit-explore-mode)
-         ("C-c c f" . treesit-beginning-of-defun)
-         ("C-c c e" . treesit-end-of-defun)))
+  :config
+  (setq treesit-language-source-alist
+        '((bash       "https://github.com/tree-sitter/tree-sitter-bash")
+          (python     "https://github.com/tree-sitter/tree-sitter-python")
+          (json       "https://github.com/tree-sitter/tree-sitter-json")
+          (yaml       "https://github.com/ikatyang/tree-sitter-yaml")
+          (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile")
+          (java       "https://github.com/tree-sitter/tree-sitter-java"))))
 
-;; 1. Dizer ao Emacs a localização exata das gramáticas testadas
-(setq treesit-language-source-alist
-  '((bash       "https://github.com/tree-sitter/tree-sitter-bash")
-    (c          "https://github.com/tree-sitter/tree-sitter-c")
-    (cpp        "https://github.com/tree-sitter/tree-sitter-cpp")
-    (python     "https://github.com/tree-sitter/tree-sitter-python")
-    (json       "https://github.com/tree-sitter/tree-sitter-json")
-    (yaml       "https://github.com/ikatyang/tree-sitter-yaml")
-    (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile")
-    (java       "https://github.com/tree-sitter/tree-sitter-java")))
-
-;; 2. Instalar automaticamente as gramáticas
-(dolist (lang '(bash c cpp python json yaml dockerfile java))
-  (unless (treesit-language-available-p lang)
-    (treesit-install-language-grammar lang)))
-
-;; 3. Configurar o treesit-auto
 (use-package treesit-auto
   :custom
-  (treesit-auto-install nil)
+  (treesit-auto-install 'prompt)
   :config
-  (setq treesit-auto-langs '(c cpp python bash json yaml dockerfile java))
-  (treesit-auto-add-to-auto-mode-alist 'all)
-  (global-treesit-auto-mode))
-#+end_src
+  (setq treesit-auto-langs (delete 'c (delete 'cpp treesit-auto-langs)))
+  (global-treesit-auto-mode)
+  (setq-default eglot-ignored-server-capabilities '(:documentHighlightProvider)))
 
-* LANGUAGE SERVER PROTOCOL (EGLOT + CLANGD)
-Obrigatório para desenvolvimento bare-metal em C.
-#+begin_src elisp
 (use-package eglot
-  :ensure nil ; Built-in
-  :hook ((c-mode c-ts-mode c++-mode c++-ts-mode java-mode java-ts-mode) . eglot-ensure)
+  :ensure nil
+  :hook ((c-mode c++-mode c-ts-mode c++-ts-mode python-ts-mode java-ts-mode) . eglot-ensure)
+  :custom
+  (eglot-events-buffer-config '(:size 0))
+  (eglot-autoshutdown t)
   :config
-  ;; Desativa logs pesados que atrasam o Emacs
-  (fset #'jsonrpc--log-event #'ignore)
-  
-  ;; Formatação automática antes de guardar (apenas para buffers geridos pelo LSP)
-  (add-hook 'eglot-managed-mode-hook
-            (lambda ()
-              (when (derived-mode-p 'c-mode 'c-ts-mode 'c++-mode 'c++-ts-mode)
-                (add-hook 'before-save-hook #'eglot-format-buffer -10 t))))
-
-  ;; Configura o clangd para projetos embebidos
   (add-to-list 'eglot-server-programs
-               '((c-mode c-ts-mode c++-mode c++-ts-mode)
+               '((c-mode c++-mode c-ts-mode c++-ts-mode)
                  . ("clangd"
                     "--background-index"
-                    "--header-insertion=never" ; Evita #includes de bibliotecas standard do SO
+                    "--header-insertion=never"
                     "--completion-style=detailed"))))
 #+end_src
 
-* ZETTELKASTEN (ORG-ROAM)
-O núcleo do sistema de notas.
+* ORG-ROAM & FERRAMENTAS DE PESQUISA E AGENDA
+
 #+begin_src elisp
+(defvar my/agenda-root (expand-file-name "~/org/roam/")
+  "Raiz indexada recursivamente pela agenda.")
+
+(defun my/agenda--descend-p (dir)
+  "Não descer em diretórios ocultos (.git, .stversions, etc.)."
+  (not (string-prefix-p "." (file-name-nondirectory (directory-file-name dir)))))
+
+(defvar my/cached-agenda-files nil
+  "Cache dos ficheiros da agenda para evitar varreduras lentas.")
+
+(defun my/org-agenda-refresh-files (&rest _)
+  "Recalcula `org-agenda-files' apenas se os ficheiros no disco mudaram."
+  (let ((current-files (directory-files-recursively
+                        my/agenda-root
+                        "\\`[^.#].*\\.org\\'"
+                        nil
+                        #'my/agenda--descend-p)))
+    ;; Só atualiza a lista e limpa a cache interna do Org se os ficheiros diferirem
+    (unless (equal current-files my/cached-agenda-files)
+      (setq my/cached-agenda-files current-files
+            org-agenda-files current-files))))
+
+;; Recalcular em todos os pontos de entrada da agenda
+(dolist (fn '(org-agenda org-agenda-list org-todo-list org-tags-view org-search-view))
+  (advice-add fn :before #'my/org-agenda-refresh-files))
+
+;; Valor inicial (para org-agenda-redo, consumidores externos, etc.)
+(with-eval-after-load 'org
+  (my/org-agenda-refresh-files))
+
 (use-package org-roam
   :ensure t
-  :demand t
+  ;; Removido o :defer t para garantir que carrega e popula a agenda corretamente
   :bind (("C-c n f" . org-roam-node-find)
          ("C-c n i" . org-roam-node-insert)
          ("C-c n t" . org-roam-tag-add)
@@ -338,43 +350,29 @@ O núcleo do sistema de notas.
   :custom
   (org-roam-directory (file-truename "~/org/roam"))
   (org-roam-dailies-directory "daily/")
-  
-  ;; Templates para as notas diárias
   (org-roam-dailies-capture-templates
-    '(("d" "default" entry
-      "* Sessão de Trabalho: %?w"
+   '(("d" "default" entry
+      "* Sessão de Trabalho: %?"
       :target (file+head "%<%Y-%m-%d>.org" 
                          "#+title: %<%Y-%m-%d>\n#+filetags: :diario:sessao:\n\n* [/] Tarefas da Sessão\n** TODO Rever pendentes da sessão anterior\n** TODO %?\n\n* Notas de Engenharia & Logs\n"))))
-
-  ;; ---- ADICIONAR AQUI AS TEMPLATES GERAIS ----
   (org-roam-capture-templates
    '(("d" "Default" plain "%?"
-      :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
-                         "#+title: ${title}\n")
+      :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
       :unnarrowed t)
      ("h" "Hardware Bring-Up" plain
       (file "~/org/templates/bringup.org")
-      :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
-                         "#+title: ${title}\n#+author: \n#+date: %<%Y-%m-%d %H:%M>\n#+filetags: :embedded:hardware:register-map:bringup:\n")
+      :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+author: \n#+date: %<%Y-%m-%d %H:%M>\n#+filetags: :embedded:hardware:register-map:bringup:\n")
       :unnarrowed t)))
-  
   :config
   (unless (file-exists-p org-roam-directory)
     (make-directory org-roam-directory t))
   (require 'org-id)
   (setq org-id-track-globally t)
   (org-roam-db-autosync-mode))
-#+end_src
 
-* GIT (MAGIT)
-#+begin_src elisp
 (use-package magit
-  :bind ("C-c g s" . magit-status)
-  :commands magit-status)
-#+end_src
+  :bind ("C-c g s" . magit-status))
 
-* ORG-ROAM-UI (GRAFO VISUAL)
-#+begin_src elisp
 (use-package org-roam-ui
   :after org-roam
   :bind ("C-c n u" . org-roam-ui-mode)
@@ -383,10 +381,7 @@ O núcleo do sistema de notas.
         org-roam-ui-follow t
         org-roam-ui-update-on-save t
         org-roam-ui-open-on-start t))
-#+end_src
 
-* LEITURA DE PDFS (PDF-TOOLS)
-#+begin_src elisp
 (use-package pdf-tools
   :defer t
   :mode ("\\.pdf\\'" . pdf-view-mode)
@@ -395,10 +390,7 @@ O núcleo do sistema de notas.
   (pdf-tools-install :no-query)
   (setq-default pdf-view-display-size 'fit-page)
   (setq pdf-annot-activate-created-annotations t))
-#+end_src
 
-* ANOTAÇÕES SINCRONIZADAS (ORG-NOTER)
-#+begin_src elisp
 (use-package org-noter
   :defer t
   :config
@@ -406,10 +398,7 @@ O núcleo do sistema de notas.
   (setq org-noter-kill-frame-at-session-end nil)
   (setq org-noter-doc-split-fraction '(0.5 . 0.5))
   (setq org-noter-notes-search-path '("~/org/roam")))
-#+end_src
 
-* BIBLIOGRAFIA (CITAR)
-#+begin_src elisp
 (use-package citar
   :bind ("C-c n x" . citar-insert-citation)
   :custom
@@ -422,10 +411,7 @@ O núcleo do sistema de notas.
   :after (citar org-roam)
   :config
   (citar-org-roam-mode))
-#+end_src
 
-* LATEX (AUCTEX)
-#+begin_src elisp
 (use-package tex
   :ensure auctex
   :custom
@@ -440,11 +426,11 @@ O núcleo do sistema de notas.
   (TeX-after-compilation-finished . TeX-revert-document-buffer))
 #+end_src
 
-* GESTÃO DE PROJETOS (PROJECTILE)
+* GESTÃO DE PROJETOS, DIRENV E DEBUG (DAPE)
+
 #+begin_src elisp
 (use-package projectile
-  :init
-  (projectile-mode +1)
+  :init (projectile-mode +1)
   :custom
   (projectile-project-search-path '("~/dev/"))
   :bind-keymap
@@ -455,223 +441,345 @@ O núcleo do sistema de notas.
   :custom
   (dired-listing-switches "-agho --group-directories-first")
   (dired-dwim-target t))
+
+(use-package envrc
+  :hook (after-init . envrc-global-mode))
+
+(use-package dape
+  :bind (("C-c d d" . dape)
+         ("C-c d b" . dape-breakpoint-toggle)
+         ("C-c d c" . dape-continue)
+         ("C-c d n" . dape-next)
+         ("C-c d s" . dape-step-in)
+         ("C-c d o" . dape-step-out)
+         ("C-c d r" . dape-restart)
+         ("C-c d q" . dape-quit)
+         ("C-c d i" . dape-info)
+         ("C-c d l" . dape-repl))
+  :custom
+  (dape-buffer-window-arrangements 'right)
+  (dape-inlay-hints t)
+  :config
+  (add-hook 'dape-repl-mode-hook #'corfu-mode)
+  (add-to-list 'dape-configs
+               `(lldb-c
+                 modes (c-mode c-ts-mode c++-mode c++-ts-mode)
+                 command "lldb-dap"
+                 :type "lldb"
+                 :request "launch"
+                 :program (lambda ()
+                            (read-file-name "Binário a depurar: "
+                                            (when-let* ((root (projectile-project-root)))
+                                              (expand-file-name "build/" root))))
+                 :cwd dape-cwd)))
 #+end_src
 
-* AI ASSISTANT (GPTEL - MULTI-BACKEND)
-Integração com APIs Cloud (OpenRouter, Anthropic, DeepSeek) via auth-source.
+* AI ASSISTANT (GPTEL MULTI-BACKEND & MCP INTEGRATION)
+
 #+begin_src elisp
 (use-package gptel
   :ensure t
-  :bind (("C-c q" . gptel-menu)
-         ("C-c RET" . gptel-send))
+  :bind (("C-c q"   . my/gptel-agent-menu)
+         ("C-c C-RET" . gptel-send)
+         ("C-c n r" . my/gptel-format-concept-note)
+         ("C-c n q" . my/gptel-generate-quiz)
+         ("C-c f"   . my/gptel-fix-region-or-buffer)
+         ("C-c c r" . my/gptel-refactor-region))
   :config
-  ;; Função auxiliar para ir buscar chaves em segurança ao ~/.authinfo
+  (require 'gptel-integrations)
+  (setq gptel-use-tools t
+        gptel-default-mode 'org-mode
+        gptel-confirm-tool-calls t)
+
   (defun my/get-api-key (host)
-    (let ((info (nth 0 (auth-source-search :host host :user "apikey"))))
-      (if info
-          (let ((secret (plist-get info :secret)))
-            (if (functionp secret) (funcall secret) secret))
-        (error "API key for %s not found in auth-source" host))))
+    (if-let* ((m (car (auth-source-search :host host :user "apikey" :require '(:secret))))
+              (s (plist-get m :secret)))
+        (if (functionp s) (funcall s) s)
+      (error "API key for %s not found in auth-source" host)))
 
-  ;; ---------------------------------------------------------
-  ;; BACKEND 1: OPENROUTER (O Canivete Suíço)
-  ;; ---------------------------------------------------------
-  (defvar gptel-openrouter
-    (gptel-make-openai "OpenRouter"
-      :host "openrouter.ai"
-      :endpoint "/api/v1/chat/completions"
-      :stream t
-      :key (lambda () (my/get-api-key "openrouter.ai"))
-      :models '("anthropic/claude-4.8-opus"		; Heavy Architect
-		"anthropic/claude-5.5-sonnet"		; Fast Systems Logic
-                "deepseek/deepseek-r2"		; Cheap Refactoring
-                "qwen/qwen-2.5-coder-32b-instruct"	; RAG / Context eater
-                "meta-llama/llama-4-70b-instruct")))
+  ;; --- BACKENDS ---
+  (gptel-make-deepseek "DeepSeek"
+    :stream t :key (lambda () (my/get-api-key "api.deepseek.com")))
+  (gptel-make-anthropic "Anthropic"
+    :stream t :key (lambda () (my/get-api-key "api.anthropic.com")))
+  (gptel-make-ollama "Ollama"
+    :host "localhost:11434" :stream t
+    :models '(llama3.2:latest qwen2.5-coder:7b))
 
-  ;; ---------------------------------------------------------
-  ;; BACKEND 2: DEEPSEEK (Direto)
-  ;; ---------------------------------------------------------
-  (defvar gptel-deepseek
-    (gptel-make-openai "DeepSeek"
-      :host "api.deepseek.com"
-      :endpoint "/chat/completions"
-      :stream t
-      :key (lambda () (my/get-api-key "api.deepseek.com"))
-      :models '("deepseek-chat" "deepseek-reasoner")))
+  (setq gptel-backend
+        (gptel-make-openai "OpenRouter"
+          :host "openrouter.ai"
+          :endpoint "/api/v1/chat/completions"
+          :stream t
+          :key (lambda () (my/get-api-key "openrouter.ai"))
+          :models '(anthropic/claude-opus-5.5
+                    openai/gpt-6-luna
+                    deepseek/deepseek-v4.1-flash
+                    deepseek/deepseek-reasoner))
+        gptel-model 'anthropic/claude-opus-5.5)
 
-  ;; ---------------------------------------------------------
-  ;; BACKEND 3: ANTHROPIC (Direto - Opcional)
-  ;; ---------------------------------------------------------
-  (defvar gptel-anthropic
-    (gptel-make-anthropic "Anthropic"
-      :stream t
-      :key (lambda () (my/get-api-key "api.anthropic.com"))))
+  ;; --- DIRETIVAS (SYSTEM PROMPTS)
+  (setq gptel-directives
+    '((default . "You are a Senior Software Architect. Tone: Concise, technical, zero fluff. Provide robust, secure, and highly optimized solutions.")
+      (hardware . "You are a Senior Embedded Systems Architect.\nEnvironment: Linux, GCC/Clang, CMake, GDB/OpenOCD.\nDomains: Bare-metal C, ARM Cortex-M (STM32), ESP32.\nPrioritize hardware reality, bitwise clarity, memory safety, and deterministic code.")
+      (python-ai . "You are an AI Tooling and MCP Architect.\nEnvironment: Python 3.10+, MCP SDK, LLM APIs.\nFocus on asynchronous execution, strict error handling, robust JSON parsing, and state machine logic.")
+      (elisp . "You are an Emacs Lisp architect.\nWrite idiomatic Emacs 31.1 code (lexical-binding, use-package, cl-lib).\nFocus on performance, non-blocking execution, and precise API mechanics.")
+      (refactor . "Act as a strict code reviewer.\n1. Identify memory safety, race conditions, blocking calls, or bitwise inefficiencies.\n2. Provide the optimized refactored code block.\n3. List structural changes and impact on time/space complexity.")
+      (zettelkasten . "Synthesize the provided text into a clean Org-mode concept note.\n1. Extract 3-5 key tags (`#tag`).\n2. Organize under structured Org headings (`*`, `**`).\n3. Format registers in **bold** and operations in inline code blocks.\n4. Restrict content STRICTLY to the provided text—do not add external knowledge.")
+      (plan . "You are an AI Software Architect operating in READ-ONLY PLAN MODE.\nYour goal is to analyze the user request and codebase, then generate a detailed implementation plan in PLAN.org.\nSTRICT RULES:\n1. DO NOT edit source files or execute destructive actions. Use ONLY read/search tools (read_file, search_codebase, find_files, list_directory_tree, inspect_code_structure).\n2. Structure your output in clean Org-mode format:\n   * Goal & Architecture Context\n   * Affected Files & Skeletons\n   * Step-by-Step Implementation Strategy\n   * Verification & Testing Commands\n3. Ask the user for explicit approval at the end.")
+      (act . "You are an AI Systems Engineer operating in EXECUTION (ACT) MODE.\nYour goal is to strictly implement the approved plan described in PLAN.org.\nSTRICT RULES:\n1. Execute the changes step-by-step using write_file and execute_shell.\n2. After writing/editing code, compile and test immediately.\n3. If compilation fails or tests break, diagnose and fix the issue before moving to the next step.\n4. When finished, summarize all applied changes and prompt the user to review the diff.")
+      (quiz . "Generate 3 active-recall questions based STRICTLY on the provided text.\nFocus on edge cases, hardware state transitions, and bitwise logic.\nFormat as an Org-mode checklist (`- [ ]`).")))
 
-  ;; Define OpenRouter + Claude 4.8 como o cérebro principal por defeito
-  (setq gptel-backend gptel-openrouter)
-  (setq gptel-model 'anthropic/claude-5.5-sonnet)
-
-  ;; ---------------------------------------------------------
-  ;; MCP SERVER & TOOL CALLING (Automated & Dynamic Engine)
-  ;; ---------------------------------------------------------
+  ;; PRESETS (MODELOS + TOOLS RESTRITIVAS)  
+  (gptel-make-preset 'refactor
+    :description "Code review estrito"
+    :backend "OpenRouter" :model 'deepseek/deepseek-v4.1-flash
+    :system (alist-get 'refactor gptel-directives))
   
-  ;; 1. MUST KEEP: Enable tool calling universally in gptel
-  (setq gptel-use-tools t)
+  (gptel-make-preset 'zettel
+    :description "Nota Zettelkasten (local)"
+    :backend "Ollama" :model 'qwen2.5-coder:7b :use-tools nil
+    :system (alist-get 'zettelkasten gptel-directives))
+  
+  (gptel-make-preset 'quiz
+    :description "Active recall (local)"
+    :backend "Ollama" :model 'qwen2.5-coder:7b :use-tools nil
+    :system (alist-get 'quiz gptel-directives))
+  
+  (gptel-make-preset 'plan-mode
+    :description "Planeamento Agêntico (Read-Only)"
+    :system (alist-get 'plan gptel-directives)
+    :tools '("read_file" "search_codebase" "find_files" "list_directory_tree" "inspect_code_structure")
+    :confirm-tool-calls nil)
+  
+  (gptel-make-preset 'act-mode
+    :description "Execução Agêntica (Read-Write + Tests)"
+    :system (alist-get 'act gptel-directives)
+    :confirm-tool-calls t)
 
-  ;; 2. Load the MCP package and define the sandbox registration logic
-  (when (require 'gptel-mcp nil t)
-    
-    (defun my/link-ai-sandbox-to-project ()
-      "Registers and restarts the MCP sandbox locked to the current Projectile root."
-      (interactive)
-      (let ((root (if (fboundp 'projectile-project-root)
-                      (projectile-project-root)
-                    default-directory)))
-        (unless root (error "Not in a project directory!"))
-        
-        ;; Register the server dynamically using the project root
-        (gptel-mcp-server "C-Sandbox"
-          :command "env"
-          :args (list (concat "MCP_WORKSPACE=" (expand-file-name root))
-                      "python3"
-                      (expand-file-name "~/ai-agent/src/mcp_server.py"))
-          :type 'stdio)
-          
-        (message "✅ AI Sandbox successfully locked to: %s" root))
-    )
+  (gptel-make-preset 'llama-notes
+    :description "Refatorizar notas com Llama 3.2"
+    :backend "Ollama" 
+    :model 'llama3.2:latest 
+    :use-tools nil
+    :system "You are an expert note-taking assistant. Your task is to refactor raw notes into a clean, well-structured Org-mode document. Organize content using appropriate hierarchical Org headings (*, **), fix typos, and keep the original meaning strictly intact.")
 
-    ;; 3. SCENARIO 1 AUTOMATION: Hook it into Projectile so it runs automatically
-    (defun my/auto-link-sandbox-to-project (&rest _)
-      "Automatically bind the MCP server when switching projects."
-      (my/link-ai-sandbox-to-project))
+  ;; --- HELPER: PROTEÇÃO DE ROOT ---
+  (defun my/project-root-strict ()
+    "Recupera o root do projeto e recusa caminhos perigosos (/ ou ~)."
+    (let* ((root (or (and (fboundp 'projectile-project-root) (projectile-project-root))
+                     (locate-dominating-file default-directory ".git")))
+           (dev-dir (file-truename (expand-file-name "~/dev/"))))
+      (unless root (user-error "Fora de um repositório!"))
+      (setq root (file-name-as-directory (file-truename root)))
 
-    ;; Automatically trigger the sync whenever Projectile switches projects
-    (advice-add 'projectile-switch-project-by-name :after #'my/auto-link-sandbox-to-project))
+      (when (or (string= root dev-dir) (not (string-prefix-p dev-dir root)))
+        (user-error "Workspace recusado por segurança: %s (Deve ser um subdiretório de ~/dev/)" root))
+      root))
+  
+  (defun my/gptel-format-concept-note ()
+    "Envia a região selecionada para o Ollama local formatar como nota Zettelkasten."
+    (interactive)
+    (unless (use-region-p)
+      (user-error "Seleciona primeiro as tuas notas cruas."))
+    (gptel-with-preset 'zettel (gptel-send)))
 
-  ;; ---------------------------------------------------------
-  ;; SCENARIO 2: THE "FIX THIS ERROR" QUICK-ACTION
-  ;; ---------------------------------------------------------
-  (defun my/gptel-fix-region-or-buffer ()
-    "Send the current region (or whole buffer) to gptel with the agent directive 
-    and instantly request an autonomous fix."
+  (defun my/gptel-format-note-llama ()
+    "Envia a região selecionada (ou o buffer inteiro) para o Llama 3.2 formatar com cabeçalhos Org-mode."
     (interactive)
     (let* ((beg (if (use-region-p) (region-beginning) (point-min)))
            (end (if (use-region-p) (region-end) (point-max)))
-           (content (buffer-substring-no-properties beg end))
-           ;; Temporarily force the agent directive for this request
-           (gptel-directives `((agent . "Fix the following code, compile it using your tools, and ensure it passes."))))
-      
-      ;; Open gptel session and fire the request immediately
-      (gptel nil nil (concat "Fix this code and make it compile:\n\n```\n" content "\n```"))
-      (message "🤖 Agent dispatched to fix code block...")))
+           (raw-note (buffer-substring-no-properties beg end)))
+      (if (use-region-p)
+          (gptel-with-preset 'llama-notes (gptel-send))
+        (gptel-with-preset 'llama-notes
+          (gptel-request (concat "Refatoriza as seguintes notas brutas, organizando-as com cabeçalhos Org-mode limpos:\n\n" raw-note)
+            :buffer (current-buffer)
+            :position (copy-marker (point-max) t)
+            :stream t)))))
 
-  ;; Bind it to a quick global shortcut
-  (global-set-key (kbd "C-c f") #'my/gptel-fix-region-or-buffer)
-
-  (defun my/mcp-quick-architecture ()
-    "Quickly inspect the architecture of the current file using the MCP server."
+  (defun my/gptel-generate-quiz ()
+    "Lê o buffer atual e gera um quiz de active recall no fim com o Ollama."
     (interactive)
-    (let ((file (buffer-file-name)))
-      (unless file (user-error "Buffer is not visiting a file"))
-      ;; Call your server's tool directly or via a transient menu
-      (message "Analyzing architecture for %s..." (file-name-nondirectory file))
-      ;; (Optional integration point with your python script or gptel)
-      ))
-  
-  ;; Add an Agent-specific prompt to your directives
-  (add-to-list 'gptel-directives 
-    '(agent . "You are an autonomous C developer operating in a strict Linux sandbox.
-You have access to tools. ALWAYS use them to verify your work.
-RULES:
-1. If asked to fix or write code, write the file to disk using your tool.
-2. Compile it using your shell tool (e.g., `gcc -Wall file.c -o out`).
-3. If it fails, read the stderr, fix the code, and re-compile.
-4. Do not explain your steps to the user. Just execute the loop until compilation passes, then report the final status."))
-  
-  ;; Mantém as tuas diretivas exatas
-  (setq gptel-directives 
-	'((default . "You are a Senior Staff Embedded Software Engineer. 
-Your primary domains are bare-metal C, ARM Cortex-M (STM32), ESP32, and Linux terminal tooling.
+    (let ((content (buffer-substring-no-properties (point-min) (point-max))))
+      (save-excursion
+        (goto-char (point-max))
+        (insert "\n\n* Active Recall Quiz\n"))
+      (gptel-with-preset 'quiz
+        (gptel-request (concat "Gera um quiz com base neste material:\n" content)
+          :buffer (current-buffer)
+          :position (copy-marker (point-max) t)
+          :stream t))))
 
-STRICT RULES OF INTERACTION:
-1. Tone: Zero fluff. No greetings, no sycophancy, no apologies. Deliver dense, direct, and highly technical answers.
-2. Architecture First: Ground your explanations in physical hardware reality. Explain memory mapping, register states, clock cycles, and bitwise operations.
-3. Code Standard: Favour direct register manipulation (bare-metal) over HAL abstractions. Write robust, deterministic C code. 
-4. Environment: Assume the user operates strictly in Linux, compiling with CMake/GCC, debugging with GDB/OpenOCD, and editing in Emacs.")
+  (defun my/gptel-fix-region-or-buffer ()
+    "Abre uma sessão dedicada e pede a correção da região (ou do buffer)."
+    (interactive)
+    (let* ((beg (if (use-region-p) (region-beginning) (point-min)))
+           (end (if (use-region-p) (region-end) (point-max)))
+           (lang (string-remove-suffix "-ts" (string-remove-suffix "-mode" (symbol-name major-mode))))
+           (code (buffer-substring-no-properties beg end))
+           (name "*gptel-fix*"))
+      (gptel name)
+      (with-current-buffer name
+        (goto-char (point-max))
+        ;; Concatenado para impedir que o Babel extraia "#+end_src" no meio da string!
+        (insert "Fix this code:\n\n#+begin_src " lang "\n" code (concat "\n#+end" "_src\n"))
+        (gptel-send))
+      (pop-to-buffer name)))
 
-	  (elisp . "You are an Emacs Lisp architect. 
-Your task is to debug, optimize, or write Emacs Lisp code for a highly customized Emacs 30 environment.
-RULES:
-1. Use modern conventions (lexical-binding, use-package, cl-lib).
-2. Prioritize performance and non-blocking execution (asynchronous processes where applicable).
-3. Provide the raw code and a dense technical explanation of the evaluation model or API used. No basic tutorials.")
+  (defun my/gptel-refactor-region ()
+    "Envia a região para revisão com o preset `refactor'."
+    (interactive)
+    (unless (use-region-p) (user-error "Seleciona um bloco de código primeiro"))
+    (gptel-with-preset 'refactor (gptel-send)))
 
-          (rag . "You are a data-extraction and synthesis engine.
-You will receive JSON or plain text data extracted from an org-roam Zettelkasten via a RAG pipeline.
-RULES:
-1. Base your answer EXCLUSIVELY on the provided data.
-2. DO NOT hallucinate external knowledge. If the answer is not in the text, state exactly that.
-3. Output the response in clean Org-mode syntax (using headings, lists, and code blocks) for easy integration into the user's notes.")
+  ;; --- SISTEMA ROBUSTO DE SNAPSHOT GIT ---
+  (defun my/git (&rest args)
+    "Executa git sincronamente devolvendo a string."
+    (with-temp-buffer
+      (let ((rc (apply #'process-file "git" nil t nil args)))
+        (unless (zerop rc) (error "git falhou: %s" (string-trim (buffer-string))))
+        (string-trim (buffer-string)))))
 
-          (refactor . "You are a strict code reviewer and refactoring engine.
-Analyze the provided C/Zig/Rust code.
-1. Identify memory leaks, race conditions, blocking operations, or inefficient bitwise logic.
-2. Provide the refactored code block.
-3. List the structural changes made in bullet points, focusing on space/time complexity and hardware safety."))))
+  (defvar my/gptel-last-checkpoint nil)
+
+  (defun my/gptel-git-checkpoint-create ()
+    "Cria um snapshot do estado atual sem alterar a working tree ou o git stash"
+    (interactive)
+    (let* ((default-directory (my/project-root-strict))
+           (idx (expand-file-name (make-temp-name "gptel-idx-") temporary-file-directory)))
+      (unwind-protect
+          (let ((process-environment (cons (concat "GIT_INDEX_FILE=" idx) process-environment)))
+            (my/git "read-tree" "HEAD")
+            (my/git "add" "-A")
+            (let* ((tree (my/git "write-tree"))
+                   (commit (my/git "commit-tree" tree "-p" "HEAD" "-m" "gptel checkpoint"))
+                   (ref (format-time-string "refs/gptel/%Y%m%d-%H%M%S")))
+              (my/git "update-ref" ref commit)
+              (setq my/gptel-last-checkpoint commit)
+              (message "🔖 Snapshot seguro gerado em: %s @ %s" ref (substring commit 0 8))))
+        (when (file-exists-p idx) (delete-file idx)))))
+
+  (defun my/gptel-git-checkpoint-rollback ()
+    "Restaura o repositório para o exato momento antes da execução do agente"
+    (interactive)
+    (unless my/gptel-last-checkpoint (user-error "Nenhum snapshot em memória para restaurar!"))
+    (let* ((default-directory (my/project-root-strict))
+           (cp my/gptel-last-checkpoint))
+      (when (yes-or-no-p (format "⚠️ Restaurar o repositório todo para %s? " (substring cp 0 8)))
+        (my/git "restore" (concat "--source=" cp) "--worktree" "--" ":/")
+        ;; Remove ficheiros extra que o LLM tenha criado
+        (let ((snap (split-string (my/git "ls-tree" "-r" "--name-only" cp) "\n" t)))
+          (dolist (f (split-string (my/git "ls-files" "--others" "--exclude-standard") "\n" t))
+            (unless (member f snap) (delete-file f))))
+        (message "⏪ Repositório restaurado limpo para %s" (substring cp 0 8)))))
+
+  (defun my/gptel-review-diff ()
+    (interactive)
+    (let ((default-directory (my/project-root-strict)))
+      (if my/gptel-last-checkpoint
+       (progn
+          (magit-diff-range my/gptel-last-checkpoint)
+          (message "Ficheiros novos/não rastreados: %s"
+                   (mapconcat #'identity
+                              (split-string (my/git "-c" "core.quotePath=false" "ls-files" "-z" "--others" "--exclude-standard") "\0" t)
+                              ", ")))
+      (user-error "Nenhum checkpoint ativo do agente para comparar!"))))
+
+  ;; --- PLAN & ACT WORKFLOW ---
+  (defun my/gptel-plan (prompt)
+    (interactive "sPrompt para o Plano (ex: Adicionar parse JSON): ")
+    (let* ((root (my/project-root-strict))
+           (plan-file (expand-file-name "PLAN.org" root))
+           (plan-buffer (find-file-noselect plan-file)))
+      (with-current-buffer plan-buffer
+        (goto-char (point-max))
+        (insert (format "\n* Plan Request [%s]: %s\n\n" 
+                        (format-time-string "%Y-%m-%d %H:%M:%S") prompt))
+        (save-buffer))
+      (pop-to-buffer plan-buffer)
+      (gptel-with-preset 'plan-mode
+        (gptel-request (format "Analisa o repositório e elabora o PLAN.org para:\n%s" prompt)
+          :buffer plan-buffer
+          :position (copy-marker (point-max) t)
+          :stream t))
+      (message "🧠 Agente em PLAN MODE (READ-ONLY). A gerar...")))
+
+  (defun my/gptel-execute-plan ()
+    (interactive)
+    (let* ((root (my/project-root-strict))
+           (plan-file (expand-file-name "PLAN.org" root)))
+      (unless (file-exists-p plan-file) (user-error "Não existe nenhum PLAN.org!"))
+      (when (y-or-n-p "🚀 Criar Snapshot Automático e EXECUTAR o PLAN.org? ")
+        (my/gptel-git-checkpoint-create)
+        (let ((plan-content (with-temp-buffer (insert-file-contents plan-file) (buffer-string)))
+              (agent-buf (get-buffer-create "*gptel-executor*")))
+          (pop-to-buffer agent-buf)
+          (unless (derived-mode-p 'text-mode) (org-mode))
+          (gptel-mode 1)
+          (goto-char (point-max))
+          (insert "\n=== A INICIAR EXECUÇÃO DO PLANO ===\n\n")
+          (gptel-with-preset 'act-mode
+            (gptel-request (concat "Executa rigorosamente este PLAN.org:\n\n" plan-content)
+              :buffer agent-buf
+              :position (copy-marker (point-max) t)
+              :stream t))
+          (message "⚡ ACT MODE Ativado. Aguardando ferramentas..."))))))
 #+end_src
 
-* AUTOMATIZAÇÃO DE MODELOS (GPTEL)
-#+begin_src elisp
-(defun my/gptel-auto-model-switch (orig-fun &rest args)
-  "Intercepts `gptel-send`. If the active system message matches the 'refactor' 
-directive, force DeepSeek. Otherwise, default to Claude."
-  (let ((gptel-model 
-         ;; Compare the current buffer's system message against the refactor directive
-         (if (string= gptel-system-message (alist-get 'refactor gptel-directives))
-             "deepseek/deepseek-r2"            ; The exact string from your :models list
-           "anthropic/claude-4.8-sonnet")))    ; The default fallback
-    (apply orig-fun args)))
+* MCP SERVER & AUTOMATION DEVICE
 
-;; Attach the advice around gptel-send
-(advice-add 'gptel-send :around #'my/gptel-auto-model-switch)
-#+end_src
-
-* ATALHO DE REFATORAÇÃO INLINE
 #+begin_src elisp
-(defun my/gptel-refactor-region ()
-  "Bypasses the gptel menu. Sends the selected region directly to DeepSeek 
-with the refactoring persona."
+(use-package mcp
+  :ensure t)
+  
+(defun my/link-ai-sandbox-to-project ()
   (interactive)
-  (unless (use-region-p)
-    (user-error "Select a block of code to refactor first."))
-  
-  ;; Dynamically bind the specific backend, model, and directive for this execution only
-  (let ((gptel-backend gptel-openrouter)
-        (gptel-model "deepseek/deepseek-r2")
-        (gptel-system-message (alist-get 'refactor gptel-directives)))
-    
-    ;; Execute the send command on the active region
-    (gptel-send)))
+  (require 'gptel)
+  (when (featurep 'mcp)
+    (let ((root (my/project-root-strict)))
+      (setf (alist-get "c-sandbox" mcp-hub-servers nil nil #'equal)
+            `(:command "python3"
+              :args (,(expand-file-name "~/ai-agent/src/mcp_server.py"))
+              :env (:MCP_WORKSPACE ,root)))
+      (ignore-errors (gptel-mcp-disconnect '("c-sandbox")))
+      (gptel-mcp-connect '("c-sandbox"))
+      (message "✅ AI Sandbox isolada montada em: %s" root))))
 
-;; Bind it to C-c c r (Code Refactor)
-(define-key global-map (kbd "C-c c r") #'my/gptel-refactor-region)
-#+end_src
+(add-hook 'projectile-after-switch-project-hook #'my/link-ai-sandbox-to-project)
 
-* PESQUISA INTELIGENTE (KHOJ)
-Integração com o servidor Khoj para busca semântica nas notas.
-#+begin_src elisp
-(use-package khoj
-  :ensure t
-  :bind ("C-c n s" . khoj) ; Atalho: "Notes Search"
+;; --- MENU TRANSIENT ---
+
+(use-package transient
+  :ensure nil
+  :after gptel
   :config
-  ;; Aponta o Emacs para o servidor
-  (setq khoj-server-url "http://127.0.0.1:5000")
-  
-  ;; Opcional: Define a pasta padrão caso use a interface local do pacote
-  (setq khoj-index-directories '("~/org/roam/")))
+  (transient-define-prefix my/gptel-agent-menu ()
+    "Dashboard do Agente AI & IDE Agêntico."
+    [["🧠 Workflow Agêntico"
+      ("p" "Criar Plano (PLAN Mode)"         my/gptel-plan)
+      ("e" "Executar PLAN.org (ACT Mode)"    my/gptel-execute-plan)]
+
+     ["🛡️ Snapshot & Segurança"
+      ("c" "Criar Snapshot Manual"       my/gptel-git-checkpoint-create)
+      ("d" "Rever Diffs (Magit)"          my/gptel-review-diff)
+      ("X" "Rollback Total (Reset Limpo)"     my/gptel-git-checkpoint-rollback)]]
+
+    [["⚡ Ações Rápidas de Código"
+      ("f" "Fix Region / Buffer"             my/gptel-fix-region-or-buffer)
+      ("R" "Refactor Region (Strict)"                 my/gptel-refactor-region)
+      ("l" "Refatorizar Nota (Llama 3.2)"     my/gptel-format-note-llama)
+      ("q" "Gerar Active Recall Quiz"       my/gptel-generate-quiz)
+      ("z" "Nota Zettelkasten"              my/gptel-format-concept-note)]
+
+     ["⚙️ Sistema & MCP Server"
+      ("s" "Relink MCP Sandbox ao Projeto"  my/link-ai-sandbox-to-project)
+      ("m" "Menu Padrão gptel"              gptel-menu)
+      ("RET" "Enviar Prompt/Região"         gptel-send)]]))
 #+end_src
 
-* LEITOR DE NOTÍCIAS (ELFEED + FRESHRSS)
+* FreshRSS
+
 #+begin_src elisp
 (use-package elfeed
   :ensure t
@@ -690,18 +798,34 @@ Integração com o servidor Khoj para busca semântica nas notas.
   :config
   (setq elfeed-use-curl t)
   ;; Atualiza o Elfeed a cada 30 minutos em background
-  (run-at-time nil (* 30 60) #'elfeed-update))
+  (run-at-time "1 minute" (* 30 60) #'elfeed-update))
 
 (use-package elfeed-protocol
   :ensure t
   :after elfeed
   :config
   (setq elfeed-protocol-fever-update-unread-only t)
-  
-  (setq elfeed-feeds
-        '(("fever+https://gabi@vm-magasirala-rss.duckdns.org"
-           :api-url "https://vm-magasirala-rss.duckdns.org/api/fever.php"
-           :use-authinfo t
-           :autotags ("freshrss"))))
-  (elfeed-protocol-enable))
+
+  ;; Procura os dados no authinfo.gpg de forma dinâmica
+  (when-let* ((auth (car (auth-source-search :machine "meu-rss")))
+              (fever-url (plist-get auth :feverurl))
+              (api-url   (plist-get auth :apiurl)))
+    
+    ;; Constrói a lista de feeds usando as variáveis secretas
+    (setq elfeed-feeds
+          `((,fever-url
+             :api-url ,api-url
+             :use-authinfo t
+             :autotags ("freshrss"))))
+    
+    (elfeed-protocol-enable)))
+#+end_src
+
+* RESTAURO DE PERFORMANCE PÓS-ARRANQUE
+
+#+begin_src elisp
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 32 1024 1024)
+                  gc-cons-percentage 0.1)))
 #+end_src
