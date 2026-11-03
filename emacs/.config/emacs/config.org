@@ -308,35 +308,24 @@ Configuração do Garbage Collector para acelerar o arranque.
 * ORG-ROAM & FERRAMENTAS DE PESQUISA E AGENDA
 
 #+begin_src elisp
-(defvar my/agenda-root (expand-file-name "~/org/roam/")
-  "Raiz indexada recursivamente pela agenda.")
+(defun my/org-roam-agenda-files ()
+  "Retorna uma lista limpa de caminhos absolutos de todos os ficheiros do org-roam."
+  (when (and (featurep 'org-roam) (org-roam-db-enabled-p))
+    (org-roam-list-files)))
 
-(defun my/agenda--descend-p (dir)
-  "Não descer em diretórios ocultos (.git, .stversions, etc.)."
-  (not (string-prefix-p "." (file-name-nondirectory (directory-file-name dir)))))
+;; Em vez de passarmos a função diretamente (que por vezes causa o erro de tipo),
+;; configuramos uma função de gancho ou passamos uma lista avaliada dinamicamente,
+;; ou garantimos que a função devolve sempre uma lista de strings.
+(setq org-agenda-files '("~/org/roam/"))
 
-(defvar my/cached-agenda-files nil
-  "Cache dos ficheiros da agenda para evitar varreduras lentas.")
+;; Atualiza automaticamente a lista de ficheiros da agenda sempre que abres a agenda
+(defun my/update-agenda-files-from-roam (&rest _)
+  (when (fboundp 'org-roam-list-files)
+    (let ((files (org-roam-list-files)))
+      (when files
+        (setq org-agenda-files files)))))
 
-(defun my/org-agenda-refresh-files (&rest _)
-  "Recalcula `org-agenda-files' apenas se os ficheiros no disco mudaram."
-  (let ((current-files (directory-files-recursively
-                        my/agenda-root
-                        "\\`[^.#].*\\.org\\'"
-                        nil
-                        #'my/agenda--descend-p)))
-    ;; Só atualiza a lista e limpa a cache interna do Org se os ficheiros diferirem
-    (unless (equal current-files my/cached-agenda-files)
-      (setq my/cached-agenda-files current-files
-            org-agenda-files current-files))))
-
-;; Recalcular em todos os pontos de entrada da agenda
-(dolist (fn '(org-agenda org-agenda-list org-todo-list org-tags-view org-search-view))
-  (advice-add fn :before #'my/org-agenda-refresh-files))
-
-;; Valor inicial (para org-agenda-redo, consumidores externos, etc.)
-(with-eval-after-load 'org
-  (my/org-agenda-refresh-files))
+(advice-add 'org-agenda :before #'my/update-agenda-files-from-roam)
 
 (use-package org-roam
   :ensure t
@@ -354,7 +343,7 @@ Configuração do Garbage Collector para acelerar o arranque.
    '(("d" "default" entry
       "* Sessão de Trabalho: %?"
       :target (file+head "%<%Y-%m-%d>.org" 
-                         "#+title: %<%Y-%m-%d>\n#+filetags: :diario:sessao:\n\n* [/] Tarefas da Sessão\n** TODO Rever pendentes da sessão anterior\n** TODO %?\n\n* Notas de Engenharia & Logs\n"))))
+                         "#+title: %<%Y-%m-%d>\n#+filetags: :diario:sessao:\n\n* [/] Tarefas da Sessão\n** TODO Rever pendentes da sessão anterior\n** TODO ?\n\n* Notas de Engenharia & Logs\n"))))
   (org-roam-capture-templates
    '(("d" "Default" plain "%?"
       :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
@@ -374,7 +363,6 @@ Configuração do Garbage Collector para acelerar o arranque.
   :bind ("C-c g s" . magit-status))
 
 (use-package org-roam-ui
-  :after org-roam
   :bind ("C-c n u" . org-roam-ui-mode)
   :config
   (setq org-roam-ui-sync-theme t
@@ -426,6 +414,9 @@ Configuração do Garbage Collector para acelerar o arranque.
   (TeX-after-compilation-finished . TeX-revert-document-buffer))
 #+end_src
 
+#+RESULTS:
+| TeX-revert-document-buffer |
+
 * GESTÃO DE PROJETOS, DIRENV E DEBUG (DAPE)
 
 #+begin_src elisp
@@ -471,6 +462,26 @@ Configuração do Garbage Collector para acelerar o arranque.
                             (read-file-name "Binário a depurar: "
                                             (when-let* ((root (projectile-project-root)))
                                               (expand-file-name "build/" root))))
+                 :cwd dape-cwd)
+	       `(cortex-m-openocd
+                 modes (c-mode c-ts-mode c++-mode c++-ts-mode asm-mode)
+                 ;; Podes usar 'arm-none-eabi-gdb' como backend DAP/GDB bridge
+                 command "arm-none-eabi-gdb"
+                 :request "launch"
+                 ;; O binário ELF compilado para o microcontrolador
+                 :program (lambda ()
+                            (read-file-name "ELF do Firmware a depurar: "
+                                            (when-let* ((root (projectile-project-root)))
+                                              (expand-file-name "build/" root))))
+                 ;; Conecta-se ao OpenOCD local na porta 3333
+                 :connect ("localhost" . 3333)
+                 ;; Comandos iniciais para parar no reset e fazer load
+                 :setupCommands (
+                   (:text "target extended-remote localhost:3333")
+                   (:text "monitor reset halt")
+                   (:text "load")
+                   (:text "monitor arm semihosting enable"))
+                 :symbolTable t
                  :cwd dape-cwd)))
 #+end_src
 
@@ -526,7 +537,7 @@ Configuração do Garbage Collector para acelerar o arranque.
       (elisp . "You are an Emacs Lisp architect.\nWrite idiomatic Emacs 31.1 code (lexical-binding, use-package, cl-lib).\nFocus on performance, non-blocking execution, and precise API mechanics.")
       (refactor . "Act as a strict code reviewer.\n1. Identify memory safety, race conditions, blocking calls, or bitwise inefficiencies.\n2. Provide the optimized refactored code block.\n3. List structural changes and impact on time/space complexity.")
       (zettelkasten . "Synthesize the provided text into a clean Org-mode concept note.\n1. Extract 3-5 key tags (`#tag`).\n2. Organize under structured Org headings (`*`, `**`).\n3. Format registers in **bold** and operations in inline code blocks.\n4. Restrict content STRICTLY to the provided text—do not add external knowledge.")
-      (plan . "You are an AI Software Architect operating in READ-ONLY PLAN MODE.\nYour goal is to analyze the user request and codebase, then generate a detailed implementation plan in PLAN.org.\nSTRICT RULES:\n1. DO NOT edit source files or execute destructive actions. Use ONLY read/search tools (read_file, search_codebase, find_files, list_directory_tree, inspect_code_structure).\n2. Structure your output in clean Org-mode format:\n   * Goal & Architecture Context\n   * Affected Files & Skeletons\n   * Step-by-Step Implementation Strategy\n   * Verification & Testing Commands\n3. Ask the user for explicit approval at the end.")
+      (plan . "You are an AI Software Architect operating in READ-ONLY PLAN MODE.\nYour goal is to analyze the user request and codebase, then generate a detailed implementation plan in PLAN.org.\nSTRICT RULES:\n1. DO NOT edit source files or execute destructive actions. Use ONLY read/search tools (read_file, search_codebase, find_files, list_directory_tree, inspect_code_structure, search_notes).\n2. Structure your output in clean Org-mode format:\n   * Goal & Architecture Context\n   * Affected Files & Skeletons\n   * Step-by-Step Implementation Strategy\n   * Verification & Testing Commands\n3. Ask the user for explicit approval at the end.")
       (act . "You are an AI Systems Engineer operating in EXECUTION (ACT) MODE.\nYour goal is to strictly implement the approved plan described in PLAN.org.\nSTRICT RULES:\n1. Execute the changes step-by-step using write_file and execute_shell.\n2. After writing/editing code, compile and test immediately.\n3. If compilation fails or tests break, diagnose and fix the issue before moving to the next step.\n4. When finished, summarize all applied changes and prompt the user to review the diff.")
       (quiz . "Generate 3 active-recall questions based STRICTLY on the provided text.\nFocus on edge cases, hardware state transitions, and bitwise logic.\nFormat as an Org-mode checklist (`- [ ]`).")))
 
@@ -549,7 +560,7 @@ Configuração do Garbage Collector para acelerar o arranque.
   (gptel-make-preset 'plan-mode
     :description "Planeamento Agêntico (Read-Only)"
     :system (alist-get 'plan gptel-directives)
-    :tools '("read_file" "search_codebase" "find_files" "list_directory_tree" "inspect_code_structure")
+    :tools '("read_file" "search_codebase" "find_files" "inspect_code_structure" "search_notes")
     :confirm-tool-calls nil)
   
   (gptel-make-preset 'act-mode
@@ -741,7 +752,7 @@ Configuração do Garbage Collector para acelerar o arranque.
       (setf (alist-get "c-sandbox" mcp-hub-servers nil nil #'equal)
             `(:command "python3"
               :args (,(expand-file-name "~/ai-agent/src/mcp_server.py"))
-              :env (:MCP_WORKSPACE ,root)))
+              :env (:MCP_WORKSPACE ,root :KHOJ_URL "http://127.0.0.1:42110")))
       (ignore-errors (gptel-mcp-disconnect '("c-sandbox")))
       (gptel-mcp-connect '("c-sandbox"))
       (message "✅ AI Sandbox isolada montada em: %s" root))))
@@ -776,6 +787,22 @@ Configuração do Garbage Collector para acelerar o arranque.
       ("s" "Relink MCP Sandbox ao Projeto"  my/link-ai-sandbox-to-project)
       ("m" "Menu Padrão gptel"              gptel-menu)
       ("RET" "Enviar Prompt/Região"         gptel-send)]]))
+#+end_src
+
+* Khoj
+
+#+begin_src elisp
+(require 'auth-source)
+
+(use-package khoj
+  :ensure t
+  :bind ("C-c k" . khoj)
+  :config
+  ;; Point to the Khoj server running in your Docker container
+  (setq khoj-server-url "http://127.0.0.1:42110")
+  
+  ;; This path MUST match the directory you mounted in Docker
+  (setq khoj-index-directories '("/home/gabi/org/roam")))
 #+end_src
 
 * FreshRSS

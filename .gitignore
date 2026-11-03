@@ -16,3 +16,51 @@ projectile-bookmarks.eld
 *~
 #*#
 .DS_Store
+
+# --- Ficheiros temporários e de auto-save do Emacs ---
+*~
+#*#
+.#*
+_flymake*
+*.elc
+
+# --- Sistema operativo ---
+.DS_Store
+Thumbs.db
+
+# --- Gestores de Pacotes e Cache (ex: straight.el, elpaca, package.el) ---
+# Se usas straight.el ou elpaca, normalmente não queres versionar 
+# os pacotes descarregados, apenas a tua receita/configuração.
+# (Descomenta se aplicável ao teu gestor de pacotes)
+# elpa/
+# straight/
+# elpaca/
+
+# --- Org-mode e Org-roam (Dados Pessoais / Diários) ---
+# Se tens notas ou o diretório do org-roam misturado na config, ignora-os:
+*.org_archive
+# Se usas o org-roam na mesma pasta e não o queres público:
+# org-roam/
+# org-agenda/
+# *.sqlite
+# *.sqlite-journal
+
+# --- Ficheiros Sensíveis e Segredos ---
+# Credenciais, authinfo encriptado ou ficheiros de tokens locais
+authinfo
+authinfo.gpg
+secrets.el
+config-local.el
+*.local.el
+
+# --- Histórico e Sessões ---
+.emacs.desktop
+.emacs.desktop.lock
+eshell/
+tramp
+auto-save-list/
+recentf
+savehist
+url/
+transient/
+treemacs-persist

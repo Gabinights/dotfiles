@@ -15,22 +15,6 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(org-agenda-files
-   '("/home/gabi/org/roam/daily/2026-05-12.org"
-     "/home/gabi/org/roam/daily/2026-05-13.org"
-     "/home/gabi/org/roam/daily/2026-05-14.org"
-     "/home/gabi/org/roam/daily/2026-05-15.org"
-     "/home/gabi/org/roam/daily/2026-05-18.org"
-     "/home/gabi/org/roam/daily/2026-05-19.org"
-     "/home/gabi/org/roam/daily/2026-05-25.org"
-     "/home/gabi/org/roam/daily/2026-05-29.org"
-     "/home/gabi/org/roam/daily/2026-06-05.org"
-     "/home/gabi/org/roam/daily/2026-06-15.org"
-     "/home/gabi/org/roam/daily/2026-06-17.org"
-     "/home/gabi/org/roam/daily/2026-10-05.org"
-     "/home/gabi/org/roam/daily/2026-10-15.org"
-     "/home/gabi/org/roam/daily/2026-10-20.org"
-     "/home/gabi/org/roam/daily/2026-10-21.org") nil nil "Customized with use-package org")
  '(package-selected-packages
    '(auctex cape citar-org-roam corfu doom-modeline doom-themes elfeed-protocol
 	    embark-consult flycheck gptel khoj magit marginalia
