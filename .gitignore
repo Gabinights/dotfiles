@@ -64,3 +64,7 @@ savehist
 url/
 transient/
 treemacs-persist
+
+# --- Khoj ---
+.env
+*.log
