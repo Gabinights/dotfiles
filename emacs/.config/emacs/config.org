@@ -530,212 +530,163 @@ Configuração do Garbage Collector para acelerar o arranque.
         gptel-model 'anthropic/claude-opus-5.5)
 
   ;; --- DIRETIVAS (SYSTEM PROMPTS)
-  (setq gptel-directives
-    '((default . "You are a Senior Software Architect. Tone: Concise, technical, zero fluff. Provide robust, secure, and highly optimized solutions.")
-      (hardware . "You are a Senior Embedded Systems Architect.\nEnvironment: Linux, GCC/Clang, CMake, GDB/OpenOCD.\nDomains: Bare-metal C, ARM Cortex-M (STM32), ESP32.\nPrioritize hardware reality, bitwise clarity, memory safety, and deterministic code.")
-      (python-ai . "You are an AI Tooling and MCP Architect.\nEnvironment: Python 3.10+, MCP SDK, LLM APIs.\nFocus on asynchronous execution, strict error handling, robust JSON parsing, and state machine logic.")
-      (elisp . "You are an Emacs Lisp architect.\nWrite idiomatic Emacs 31.1 code (lexical-binding, use-package, cl-lib).\nFocus on performance, non-blocking execution, and precise API mechanics.")
-      (refactor . "Act as a strict code reviewer.\n1. Identify memory safety, race conditions, blocking calls, or bitwise inefficiencies.\n2. Provide the optimized refactored code block.\n3. List structural changes and impact on time/space complexity.")
-      (zettelkasten . "Synthesize the provided text into a clean Org-mode concept note.\n1. Extract 3-5 key tags (`#tag`).\n2. Organize under structured Org headings (`*`, `**`).\n3. Format registers in **bold** and operations in inline code blocks.\n4. Restrict content STRICTLY to the provided text—do not add external knowledge.")
-      (plan . "You are an AI Software Architect operating in READ-ONLY PLAN MODE.\nYour goal is to analyze the user request and codebase, then generate a detailed implementation plan in PLAN.org.\nSTRICT RULES:\n1. DO NOT edit source files or execute destructive actions. Use ONLY read/search tools (read_file, search_codebase, find_files, list_directory_tree, inspect_code_structure, search_notes).\n2. Structure your output in clean Org-mode format:\n   * Goal & Architecture Context\n   * Affected Files & Skeletons\n   * Step-by-Step Implementation Strategy\n   * Verification & Testing Commands\n3. Ask the user for explicit approval at the end.")
-      (act . "You are an AI Systems Engineer operating in EXECUTION (ACT) MODE.\nYour goal is to strictly implement the approved plan described in PLAN.org.\nSTRICT RULES:\n1. Execute the changes step-by-step using write_file and execute_shell.\n2. After writing/editing code, compile and test immediately.\n3. If compilation fails or tests break, diagnose and fix the issue before moving to the next step.\n4. When finished, summarize all applied changes and prompt the user to review the diff.")
-      (quiz . "Generate 3 active-recall questions based STRICTLY on the provided text.\nFocus on edge cases, hardware state transitions, and bitwise logic.\nFormat as an Org-mode checklist (`- [ ]`).")))
+  ;; --- DIRETIVAS (SYSTEM PROMPTS) ---
+(setq gptel-directives
+  '((default  . "You are a Senior Software Architect. Tone: Concise, technical, zero fluff. Provide robust, secure, and highly optimized solutions.")
+    (refactor . "Act as a strict code reviewer.\n1. Identify memory safety, race conditions, blocking calls, or bitwise inefficiencies.\n2. Provide the optimized refactored code block.\n3. List structural changes and impact on time/space complexity.")
+    (notes    . "Synthesize the provided text into a clean Org-mode concept note.\n1. Extract 3-5 key tags (`#tag`).\n2. Organize under structured Org headings (`*`, `**`).\n3. Format registers in **bold** and operations in inline code blocks.\n4. Restrict content STRICTLY to the provided text.")
+    (plan     . "You are an AI Architect in READ-ONLY PLAN MODE.\nGenerate a detailed implementation plan in PLAN.org.\n1. DO NOT edit source files. Use ONLY read/search tools.\n2. Structure output in Org-mode: Goal, Affected Files, Step-by-Step Strategy, Testing.\n3. Ask for explicit approval.")
+    (act      . "You are an AI Engineer in EXECUTION MODE.\nImplement the approved PLAN.org.\n1. Execute changes step-by-step using write_file/execute_shell.\n2. Compile and test immediately after edits.\n3. Fix issues before proceeding.\n4. Summarize changes and prompt for diff review.")
+    (quiz     . "Generate 3 active-recall questions based STRICTLY on the provided text. Focus on edge cases and logic. Format as an Org-mode checklist (`- [ ]`).")))
 
-  ;; PRESETS (MODELOS + TOOLS RESTRITIVAS)  
-  (gptel-make-preset 'refactor
-    :description "Code review estrito"
-    :backend "OpenRouter" :model 'deepseek/deepseek-v4.1-flash
-    :system (alist-get 'refactor gptel-directives))
-  
-  (gptel-make-preset 'zettel
-    :description "Nota Zettelkasten (local)"
-    :backend "Ollama" :model 'qwen2.5-coder:7b :use-tools nil
-    :system (alist-get 'zettelkasten gptel-directives))
-  
-  (gptel-make-preset 'quiz
-    :description "Active recall (local)"
-    :backend "Ollama" :model 'qwen2.5-coder:7b :use-tools nil
-    :system (alist-get 'quiz gptel-directives))
-  
-  (gptel-make-preset 'plan-mode
-    :description "Planeamento Agêntico (Read-Only)"
-    :system (alist-get 'plan gptel-directives)
-    :tools '("read_file" "search_codebase" "find_files" "inspect_code_structure" "search_notes")
-    :confirm-tool-calls nil)
-  
-  (gptel-make-preset 'act-mode
-    :description "Execução Agêntica (Read-Write + Tests)"
-    :system (alist-get 'act gptel-directives)
-    :confirm-tool-calls t)
+;; --- PRESETS ---
+(gptel-make-preset 'refactor :description "Code review estrito" :backend "OpenRouter" :model 'deepseek/deepseek-v4.1-flash :system (alist-get 'refactor gptel-directives))
+(gptel-make-preset 'notes    :description "Refatorizar notas (Org)" :backend "Ollama" :model 'llama3.2:latest :use-tools nil :system (alist-get 'notes gptel-directives))
+(gptel-make-preset 'quiz     :description "Active recall" :backend "Ollama" :model 'llama3.2:latest :use-tools nil :system (alist-get 'quiz gptel-directives))
+(gptel-make-preset 'plan-mode :description "Planeamento (Read-Only)" :system (alist-get 'plan gptel-directives) :tools '("read_file" "search_codebase" "find_files" "inspect_code_structure" "search_notes") :confirm-tool-calls nil)
+(gptel-make-preset 'act-mode  :description "Execução (Read-Write)" :system (alist-get 'act gptel-directives) :confirm-tool-calls t)
 
-  (gptel-make-preset 'llama-notes
-    :description "Refatorizar notas com Llama 3.2"
-    :backend "Ollama" 
-    :model 'llama3.2:latest 
-    :use-tools nil
-    :system "You are an expert note-taking assistant. Your task is to refactor raw notes into a clean, well-structured Org-mode document. Organize content using appropriate hierarchical Org headings (*, **), fix typos, and keep the original meaning strictly intact.")
+;; --- HELPER: PROTEÇÃO DE ROOT ---
+(defun my/project-root-strict ()
+  "Recupera o root do projeto e recusa caminhos perigosos."
+  (let* ((root (or (and (fboundp 'projectile-project-root) (projectile-project-root))
+                   (locate-dominating-file default-directory ".git")))
+         (dev-dir (file-truename (expand-file-name "~/dev/"))))
+    (unless root (user-error "Fora de um repositório!"))
+    (setq root (file-name-as-directory (file-truename root)))
+    (when (or (string= root dev-dir) (not (string-prefix-p dev-dir root)))
+      (user-error "Workspace recusado: %s (Deve ser subdiretório de ~/dev/)" root))
+    root))
 
-  ;; --- HELPER: PROTEÇÃO DE ROOT ---
-  (defun my/project-root-strict ()
-    "Recupera o root do projeto e recusa caminhos perigosos (/ ou ~)."
-    (let* ((root (or (and (fboundp 'projectile-project-root) (projectile-project-root))
-                     (locate-dominating-file default-directory ".git")))
-           (dev-dir (file-truename (expand-file-name "~/dev/"))))
-      (unless root (user-error "Fora de um repositório!"))
-      (setq root (file-name-as-directory (file-truename root)))
+;; --- FUNÇÕES DE TEXTO E CÓDIGO ---
+(defun my/gptel-format-notes ()
+  "Envia a região ou buffer para formatação Org-mode."
+  (interactive)
+  (let* ((beg (if (use-region-p) (region-beginning) (point-min)))
+         (end (if (use-region-p) (region-end) (point-max)))
+         (raw-note (buffer-substring-no-properties beg end)))
+    (if (use-region-p)
+        (gptel-with-preset 'notes (gptel-send))
+      (gptel-with-preset 'notes
+        (gptel-request (concat "Refatoriza estas notas brutas:\n\n" raw-note)
+                       :buffer (current-buffer)
+                       :position (copy-marker (point-max) t)
+                       :stream t)))))
 
-      (when (or (string= root dev-dir) (not (string-prefix-p dev-dir root)))
-        (user-error "Workspace recusado por segurança: %s (Deve ser um subdiretório de ~/dev/)" root))
-      root))
-  
-  (defun my/gptel-format-concept-note ()
-    "Envia a região selecionada para o Ollama local formatar como nota Zettelkasten."
-    (interactive)
-    (unless (use-region-p)
-      (user-error "Seleciona primeiro as tuas notas cruas."))
-    (gptel-with-preset 'zettel (gptel-send)))
+(defun my/gptel-generate-quiz ()
+  "Gera um quiz de active recall no fim do buffer."
+  (interactive)
+  (let ((content (buffer-substring-no-properties (point-min) (point-max))))
+    (save-excursion
+      (goto-char (point-max))
+      (insert "\n\n* Active Recall Quiz\n"))
+    (gptel-with-preset 'quiz
+      (gptel-request (concat "Gera um quiz:\n" content)
+                     :buffer (current-buffer)
+                     :position (copy-marker (point-max) t)
+                     :stream t))))
 
-  (defun my/gptel-format-note-llama ()
-    "Envia a região selecionada (ou o buffer inteiro) para o Llama 3.2 formatar com cabeçalhos Org-mode."
-    (interactive)
-    (let* ((beg (if (use-region-p) (region-beginning) (point-min)))
-           (end (if (use-region-p) (region-end) (point-max)))
-           (raw-note (buffer-substring-no-properties beg end)))
-      (if (use-region-p)
-          (gptel-with-preset 'llama-notes (gptel-send))
-        (gptel-with-preset 'llama-notes
-          (gptel-request (concat "Refatoriza as seguintes notas brutas, organizando-as com cabeçalhos Org-mode limpos:\n\n" raw-note)
-            :buffer (current-buffer)
-            :position (copy-marker (point-max) t)
-            :stream t)))))
+(defun my/gptel-refactor-code ()
+  "Abre sessão dedicada para rever a região atual."
+  (interactive)
+  (unless (use-region-p) (user-error "Seleciona um bloco de código primeiro"))
+  (let* ((lang (string-remove-suffix "-ts" (string-remove-suffix "-mode" (symbol-name major-mode))))
+         (code (buffer-substring-no-properties (region-beginning) (region-end)))
+         (name "*gptel-fix*"))
+    (gptel name)
+    (with-current-buffer name
+      (goto-char (point-max))
+      (insert "Review this code:\n\n#+begin_src " lang "\n" code (concat "\n#+end" "_src\n"))
+      (gptel-with-preset 'refactor (gptel-send)))
+    (pop-to-buffer name)))
 
-  (defun my/gptel-generate-quiz ()
-    "Lê o buffer atual e gera um quiz de active recall no fim com o Ollama."
-    (interactive)
-    (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-      (save-excursion
-        (goto-char (point-max))
-        (insert "\n\n* Active Recall Quiz\n"))
-      (gptel-with-preset 'quiz
-        (gptel-request (concat "Gera um quiz com base neste material:\n" content)
-          :buffer (current-buffer)
-          :position (copy-marker (point-max) t)
-          :stream t))))
+;; --- SISTEMA ROBUSTO DE SNAPSHOT GIT (Inalterado, excelente implementação) ---
+(defun my/git (&rest args)
+  (with-temp-buffer
+    (let ((rc (apply #'process-file "git" nil t nil args)))
+      (unless (zerop rc) (error "git falhou: %s" (string-trim (buffer-string))))
+      (string-trim (buffer-string)))))
 
-  (defun my/gptel-fix-region-or-buffer ()
-    "Abre uma sessão dedicada e pede a correção da região (ou do buffer)."
-    (interactive)
-    (let* ((beg (if (use-region-p) (region-beginning) (point-min)))
-           (end (if (use-region-p) (region-end) (point-max)))
-           (lang (string-remove-suffix "-ts" (string-remove-suffix "-mode" (symbol-name major-mode))))
-           (code (buffer-substring-no-properties beg end))
-           (name "*gptel-fix*"))
-      (gptel name)
-      (with-current-buffer name
-        (goto-char (point-max))
-        ;; Concatenado para impedir que o Babel extraia "#+end_src" no meio da string!
-        (insert "Fix this code:\n\n#+begin_src " lang "\n" code (concat "\n#+end" "_src\n"))
-        (gptel-send))
-      (pop-to-buffer name)))
+(defvar my/gptel-last-checkpoint nil)
 
-  (defun my/gptel-refactor-region ()
-    "Envia a região para revisão com o preset `refactor'."
-    (interactive)
-    (unless (use-region-p) (user-error "Seleciona um bloco de código primeiro"))
-    (gptel-with-preset 'refactor (gptel-send)))
+(defun my/gptel-git-checkpoint-create ()
+  (interactive)
+  (let* ((default-directory (my/project-root-strict))
+         (idx (expand-file-name (make-temp-name "gptel-idx-") temporary-file-directory)))
+    (unwind-protect
+        (let ((process-environment (cons (concat "GIT_INDEX_FILE=" idx) process-environment)))
+          (my/git "read-tree" "HEAD")
+          (my/git "add" "-A")
+          (let* ((tree (my/git "write-tree"))
+                 (commit (my/git "commit-tree" tree "-p" "HEAD" "-m" "gptel checkpoint"))
+                 (ref (format-time-string "refs/gptel/%Y%m%d-%H%M%S")))
+            (my/git "update-ref" ref commit)
+            (setq my/gptel-last-checkpoint commit)
+            (message "🔖 Snapshot seguro gerado em: %s @ %s" ref (substring commit 0 8))))
+      (when (file-exists-p idx) (delete-file idx)))))
 
-  ;; --- SISTEMA ROBUSTO DE SNAPSHOT GIT ---
-  (defun my/git (&rest args)
-    "Executa git sincronamente devolvendo a string."
-    (with-temp-buffer
-      (let ((rc (apply #'process-file "git" nil t nil args)))
-        (unless (zerop rc) (error "git falhou: %s" (string-trim (buffer-string))))
-        (string-trim (buffer-string)))))
+(defun my/gptel-git-checkpoint-rollback ()
+  (interactive)
+  (unless my/gptel-last-checkpoint (user-error "Nenhum snapshot em memória!"))
+  (let* ((default-directory (my/project-root-strict))
+         (cp my/gptel-last-checkpoint))
+    (when (yes-or-no-p (format "⚠️ Restaurar o repositório todo para %s? " (substring cp 0 8)))
+      (my/git "restore" (concat "--source=" cp) "--worktree" "--" ":/")
+      (let ((snap (split-string (my/git "ls-tree" "-r" "--name-only" cp) "\n" t)))
+        (dolist (f (split-string (my/git "ls-files" "--others" "--exclude-standard") "\n" t))
+          (unless (member f snap) (delete-file f))))
+      (message "⏪ Repositório restaurado limpo para %s" (substring cp 0 8)))))
 
-  (defvar my/gptel-last-checkpoint nil)
-
-  (defun my/gptel-git-checkpoint-create ()
-    "Cria um snapshot do estado atual sem alterar a working tree ou o git stash"
-    (interactive)
-    (let* ((default-directory (my/project-root-strict))
-           (idx (expand-file-name (make-temp-name "gptel-idx-") temporary-file-directory)))
-      (unwind-protect
-          (let ((process-environment (cons (concat "GIT_INDEX_FILE=" idx) process-environment)))
-            (my/git "read-tree" "HEAD")
-            (my/git "add" "-A")
-            (let* ((tree (my/git "write-tree"))
-                   (commit (my/git "commit-tree" tree "-p" "HEAD" "-m" "gptel checkpoint"))
-                   (ref (format-time-string "refs/gptel/%Y%m%d-%H%M%S")))
-              (my/git "update-ref" ref commit)
-              (setq my/gptel-last-checkpoint commit)
-              (message "🔖 Snapshot seguro gerado em: %s @ %s" ref (substring commit 0 8))))
-        (when (file-exists-p idx) (delete-file idx)))))
-
-  (defun my/gptel-git-checkpoint-rollback ()
-    "Restaura o repositório para o exato momento antes da execução do agente"
-    (interactive)
-    (unless my/gptel-last-checkpoint (user-error "Nenhum snapshot em memória para restaurar!"))
-    (let* ((default-directory (my/project-root-strict))
-           (cp my/gptel-last-checkpoint))
-      (when (yes-or-no-p (format "⚠️ Restaurar o repositório todo para %s? " (substring cp 0 8)))
-        (my/git "restore" (concat "--source=" cp) "--worktree" "--" ":/")
-        ;; Remove ficheiros extra que o LLM tenha criado
-        (let ((snap (split-string (my/git "ls-tree" "-r" "--name-only" cp) "\n" t)))
-          (dolist (f (split-string (my/git "ls-files" "--others" "--exclude-standard") "\n" t))
-            (unless (member f snap) (delete-file f))))
-        (message "⏪ Repositório restaurado limpo para %s" (substring cp 0 8)))))
-
-  (defun my/gptel-review-diff ()
-    (interactive)
-    (let ((default-directory (my/project-root-strict)))
-      (if my/gptel-last-checkpoint
-       (progn
+(defun my/gptel-review-diff ()
+  (interactive)
+  (let ((default-directory (my/project-root-strict)))
+    (if my/gptel-last-checkpoint
+        (progn
           (magit-diff-range my/gptel-last-checkpoint)
-          (message "Ficheiros novos/não rastreados: %s"
+          (message "Ficheiros novos: %s"
                    (mapconcat #'identity
                               (split-string (my/git "-c" "core.quotePath=false" "ls-files" "-z" "--others" "--exclude-standard") "\0" t)
                               ", ")))
-      (user-error "Nenhum checkpoint ativo do agente para comparar!"))))
+      (user-error "Nenhum checkpoint ativo!"))))
 
-  ;; --- PLAN & ACT WORKFLOW ---
-  (defun my/gptel-plan (prompt)
-    (interactive "sPrompt para o Plano (ex: Adicionar parse JSON): ")
-    (let* ((root (my/project-root-strict))
-           (plan-file (expand-file-name "PLAN.org" root))
-           (plan-buffer (find-file-noselect plan-file)))
-      (with-current-buffer plan-buffer
+;; --- PLAN & ACT WORKFLOW ---
+(defun my/gptel-plan (prompt)
+  (interactive "sPrompt para o Plano: ")
+  (let* ((root (my/project-root-strict))
+         (plan-file (expand-file-name "PLAN.org" root))
+         (plan-buffer (find-file-noselect plan-file)))
+    (with-current-buffer plan-buffer
+      (goto-char (point-max))
+      (insert (format "\n* Plan Request [%s]: %s\n\n" (format-time-string "%Y-%m-%d %H:%M:%S") prompt))
+      (save-buffer))
+    (pop-to-buffer plan-buffer)
+    (gptel-with-preset 'plan-mode
+      (gptel-request (format "Analisa o repositório e elabora o PLAN.org para:\n%s" prompt)
+                     :buffer plan-buffer
+                     :position (copy-marker (point-max) t)
+                     :stream t))
+    (message "🧠 Agente em PLAN MODE (READ-ONLY). A gerar...")))
+
+(defun my/gptel-execute-plan ()
+  (interactive)
+  (let* ((root (my/project-root-strict))
+         (plan-file (expand-file-name "PLAN.org" root)))
+    (unless (file-exists-p plan-file) (user-error "Não existe nenhum PLAN.org!"))
+    (when (y-or-n-p "🚀 Criar Snapshot Automático e EXECUTAR o PLAN.org? ")
+      (my/gptel-git-checkpoint-create)
+      (let ((plan-content (with-temp-buffer (insert-file-contents plan-file) (buffer-string)))
+            (agent-buf (get-buffer-create "*gptel-executor*")))
+        (pop-to-buffer agent-buf)
+        (unless (derived-mode-p 'text-mode) (org-mode))
+        (gptel-mode 1)
         (goto-char (point-max))
-        (insert (format "\n* Plan Request [%s]: %s\n\n" 
-                        (format-time-string "%Y-%m-%d %H:%M:%S") prompt))
-        (save-buffer))
-      (pop-to-buffer plan-buffer)
-      (gptel-with-preset 'plan-mode
-        (gptel-request (format "Analisa o repositório e elabora o PLAN.org para:\n%s" prompt)
-          :buffer plan-buffer
-          :position (copy-marker (point-max) t)
-          :stream t))
-      (message "🧠 Agente em PLAN MODE (READ-ONLY). A gerar...")))
-
-  (defun my/gptel-execute-plan ()
-    (interactive)
-    (let* ((root (my/project-root-strict))
-           (plan-file (expand-file-name "PLAN.org" root)))
-      (unless (file-exists-p plan-file) (user-error "Não existe nenhum PLAN.org!"))
-      (when (y-or-n-p "🚀 Criar Snapshot Automático e EXECUTAR o PLAN.org? ")
-        (my/gptel-git-checkpoint-create)
-        (let ((plan-content (with-temp-buffer (insert-file-contents plan-file) (buffer-string)))
-              (agent-buf (get-buffer-create "*gptel-executor*")))
-          (pop-to-buffer agent-buf)
-          (unless (derived-mode-p 'text-mode) (org-mode))
-          (gptel-mode 1)
-          (goto-char (point-max))
-          (insert "\n=== A INICIAR EXECUÇÃO DO PLANO ===\n\n")
-          (gptel-with-preset 'act-mode
-            (gptel-request (concat "Executa rigorosamente este PLAN.org:\n\n" plan-content)
-              :buffer agent-buf
-              :position (copy-marker (point-max) t)
-              :stream t))
-          (message "⚡ ACT MODE Ativado. Aguardando ferramentas..."))))))
+        (insert "\n=== A INICIAR EXECUÇÃO DO PLANO ===\n\n")
+        (gptel-with-preset 'act-mode
+          (gptel-request (concat "Executa rigorosamente este PLAN.org:\n\n" plan-content)
+                         :buffer agent-buf
+                         :position (copy-marker (point-max) t)
+                         :stream t))
+        (message "⚡ ACT MODE Ativado. Aguardando ferramentas..."))))))
 #+end_src
 
 * MCP SERVER & AUTOMATION DEVICE
@@ -779,9 +730,8 @@ Configuração do Garbage Collector para acelerar o arranque.
     [["⚡ Ações Rápidas de Código"
       ("f" "Fix Region / Buffer"             my/gptel-fix-region-or-buffer)
       ("R" "Refactor Region (Strict)"                 my/gptel-refactor-region)
-      ("l" "Refatorizar Nota (Llama 3.2)"     my/gptel-format-note-llama)
-      ("q" "Gerar Active Recall Quiz"       my/gptel-generate-quiz)
-      ("z" "Nota Zettelkasten"              my/gptel-format-concept-note)]
+      ("l" "Refatorizar Nota (Llama 3.2)"     my/gptel-format-notes)
+      ("q" "Gerar Active Recall Quiz"       my/gptel-generate-quiz)]
 
      ["⚙️ Sistema & MCP Server"
       ("s" "Relink MCP Sandbox ao Projeto"  my/link-ai-sandbox-to-project)
